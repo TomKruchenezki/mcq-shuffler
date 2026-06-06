@@ -73,6 +73,15 @@ You can also trigger it manually from **Actions → Deploy to GitHub Pages → R
 Next.js 15 · React 19 · TypeScript · Tailwind CSS · Vitest  
 mammoth (DOCX extraction) · pdfjs-dist (PDF extraction) · docx (DOCX generation)
 
+## Manual Verification (Step 7 — file upload)
+
+After building and opening the app locally, verify each path:
+
+1. **Paste text** — click "טען דוגמה", then "נתח מבחן". Three questions should appear in the parse preview.
+2. **Upload DOCX** — prepare any `.docx` file with Hebrew MCQ questions. Click "בחר קובץ", select the file. The file name and a short text preview should appear. Click "נתח מבחן" — questions should parse normally.
+3. **Upload text-based PDF** — prepare a `.pdf` created from a Word doc (not scanned). Upload it. Extracted text preview appears; parse → shuffle → export DOCX/CSV should work end-to-end.
+4. **Upload scanned PDF** — prepare a scanned or image-only PDF. After upload, the amber warning "נראה שה-PDF סרוק או שהטקסט לא חולץ טוב. מומלץ להשתמש בקובץ Word אם אפשר." should appear.
+
 ## Project guidance
 
 **`CLAUDE.md`** (project root) — Project purpose, core invariants, RTL rules, privacy rules,

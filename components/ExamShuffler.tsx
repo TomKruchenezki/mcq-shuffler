@@ -9,6 +9,7 @@ import ParsedExamPreview from './ParsedExamPreview'
 import ShuffledExamView from './ShuffledExamView'
 import AnswerKeyTable from './AnswerKeyTable'
 import ExportButtons from './ExportButtons'
+import FileUpload from './FileUpload'
 
 const SAMPLE_EXAM_TEXT = `1. מה מחזירה הפונקציה getUserName כאשר user_id=123?
 א. היא מחזירה string תקין
@@ -71,6 +72,9 @@ export default function ExamShuffler() {
       <h1 className="text-3xl font-bold text-center mb-8 text-gray-900">
         מערבל תשובות אמריקאיות
       </h1>
+
+      {/* File upload */}
+      <FileUpload onExtracted={(t) => setRawText(t)} />
 
       {/* Quick-fill demo button */}
       <div className="mb-3 text-start">
