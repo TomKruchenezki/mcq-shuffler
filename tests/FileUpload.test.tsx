@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import FileUpload from '@/components/FileUpload'
 
-const { mockExtractDocxText, mockExtractPdfHybrid } = vi.hoisted(() => ({
+const { mockExtractDocxText, mockExtractPdfHybrid, mockExtractPdfVisual } = vi.hoisted(() => ({
   mockExtractDocxText: vi.fn(),
   mockExtractPdfHybrid: vi.fn(),
+  mockExtractPdfVisual: vi.fn(),
 }))
 
 vi.mock('@/lib/extract/extractDocx', () => ({ extractDocxText: mockExtractDocxText }))
 vi.mock('@/lib/extract/pdfEngine/extractPdfHybrid', () => ({
   extractPdfHybrid: mockExtractPdfHybrid,
+}))
+vi.mock('@/lib/extract/pdfEngine/extractPdfVisual', () => ({
+  extractPdfVisual: mockExtractPdfVisual,
 }))
 
 function uploadFile(input: Element, file: File) {
@@ -93,6 +97,14 @@ describe('FileUpload', () => {
     expect(autoRadio).toBeChecked()
   })
 
+  it('PDF mode selector shows 4 options including נאמנות גבוהה', () => {
+    render(<FileUpload onExtracted={() => {}} />)
+    expect(screen.getByText('אוטומטי')).toBeInTheDocument()
+    expect(screen.getByText('טקסט מהיר')).toBeInTheDocument()
+    expect(screen.getByText('OCR מקומי')).toBeInTheDocument()
+    expect(screen.getByText('נאמנות גבוהה')).toBeInTheDocument()
+  })
+
   it('calls onExtracted with text extracted from a PDF file', async () => {
     mockExtractPdfHybrid.mockResolvedValue({
       text: 'שאלה 1\nא. כן\nב. לא',
@@ -122,5 +134,98 @@ describe('FileUpload', () => {
       'auto',
       expect.any(Function),
     )
+  })
+
+  it('visual mode calls extractPdfVisual, not extractPdfHybrid', async () => {
+    mockExtractPdfVisual.mockResolvedValue({ visualQuestions: [] })
+    render(<FileUpload onExtracted={() => {}} />)
+
+    fireEvent.click(screen.getByDisplayValue('visual'))
+
+    const input = document.querySelector('input[type="file"]')!
+    await act(async () => {
+      uploadFile(input, new File(['dummy pdf'], 'exam.pdf'))
+    })
+
+    await waitFor(() => {
+      expect(mockExtractPdfVisual).toHaveBeenCalled()
+    })
+    expect(mockExtractPdfHybrid).not.toHaveBeenCalled()
+  })
+
+  it('visual mode calls onVisualExtracted with VisualExtractionResult', async () => {
+    const visualResult = {
+      visualQuestions: [
+        {
+          number: 1,
+          stemDataUrl: 'data:,stem',
+          options: [],
+          pageIndex: 0,
+        },
+      ],
+    }
+    mockExtractPdfVisual.mockResolvedValue(visualResult)
+    const onVisualExtracted = vi.fn()
+    render(<FileUpload onExtracted={() => {}} onVisualExtracted={onVisualExtracted} />)
+
+    fireEvent.click(screen.getByDisplayValue('visual'))
+
+    const input = document.querySelector('input[type="file"]')!
+    await act(async () => {
+      uploadFile(input, new File(['dummy pdf'], 'exam.pdf'))
+    })
+
+    await waitFor(() => {
+      expect(onVisualExtracted).toHaveBeenCalledWith(visualResult)
+    })
+  })
+
+  it('complexity hint banner appears when result has hasImages=true', async () => {
+    mockExtractPdfHybrid.mockResolvedValue({
+      text: 'שאלה 1\nא. כן\nב. לא',
+      quality: {
+        pages: 1,
+        textItems: 10,
+        chars: 200,
+        detectedQuestionMarkers: 1,
+        detectedOptionMarkers: 2,
+        suspiciousJoinedWords: 0,
+        hasEnoughLineBreaks: true,
+      },
+      complexity: {
+        hasImages: true,
+        hasTables: false,
+        hasMultiColumnText: false,
+        hasFormulas: false,
+      },
+    })
+    render(<FileUpload onExtracted={() => {}} />)
+
+    const input = document.querySelector('input[type="file"]')!
+    await act(async () => {
+      uploadFile(input, new File(['dummy pdf'], 'exam.pdf'))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByText(/זוהה מבנה מורכב/)).toBeInTheDocument()
+    })
+  })
+
+  it('no crash when onVisualExtracted prop is absent and visual mode used', async () => {
+    mockExtractPdfVisual.mockResolvedValue({ visualQuestions: [] })
+    render(<FileUpload onExtracted={() => {}} />)
+
+    fireEvent.click(screen.getByDisplayValue('visual'))
+
+    const input = document.querySelector('input[type="file"]')!
+    await expect(
+      act(async () => {
+        uploadFile(input, new File(['dummy pdf'], 'exam.pdf'))
+      }),
+    ).resolves.not.toThrow()
+
+    await waitFor(() => {
+      expect(mockExtractPdfVisual).toHaveBeenCalled()
+    })
   })
 })

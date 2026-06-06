@@ -3,10 +3,15 @@
 import { useState } from 'react'
 import { parseExam } from '@/lib/parser/parseQuestions'
 import { shuffleExam, generateAnswerKey } from '@/lib/shuffle/shuffleExam'
+import { shuffleVisualExam, generateVisualAnswerKey } from '@/lib/shuffle/shuffleVisualExam'
 import type { ParsedExam } from '@/lib/parser/parseQuestions'
 import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
+import type { VisualQuestion, ShuffledVisualExam } from '@/lib/extract/pdfEngine/visualTypes'
+import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes'
 import ParsedExamPreview from './ParsedExamPreview'
 import ShuffledExamView from './ShuffledExamView'
+import VisualShuffledExamView from './VisualShuffledExamView'
+import VisualPrintableExam from './VisualPrintableExam'
 import AnswerKeyTable from './AnswerKeyTable'
 import ExportButtons from './ExportButtons'
 import FileUpload from './FileUpload'
@@ -43,7 +48,13 @@ export default function ExamShuffler() {
   const [shuffledExam, setShuffledExam] = useState<ShuffledExam | null>(null)
   const [answerKey, setAnswerKey] = useState<AnswerKeyRow[] | null>(null)
 
-  const canShuffle = parsedExam !== null && parsedExam.questions.length > 0
+  // Parallel visual pipeline state
+  const [visualQuestions, setVisualQuestions] = useState<VisualQuestion[] | null>(null)
+  const [shuffledVisualExam, setShuffledVisualExam] = useState<ShuffledVisualExam | null>(null)
+
+  const canShuffle =
+    (parsedExam !== null && parsedExam.questions.length > 0) ||
+    (visualQuestions !== null && visualQuestions.length > 0)
 
   function handleParse() {
     const result = parseExam(rawText)
@@ -53,10 +64,23 @@ export default function ExamShuffler() {
   }
 
   function handleShuffle() {
+    // Visual pipeline takes priority when visual questions are loaded
+    if (visualQuestions && visualQuestions.length > 0) {
+      const shuffled = shuffleVisualExam(visualQuestions)
+      setShuffledVisualExam(shuffled)
+      setAnswerKey(generateVisualAnswerKey(shuffled))
+      return
+    }
     if (!parsedExam) return
     const shuffled = shuffleExam(parsedExam)
     setShuffledExam(shuffled)
     setAnswerKey(generateAnswerKey(shuffled))
+  }
+
+  function handleVisualExtracted(r: VisualExtractionResult) {
+    setVisualQuestions(r.visualQuestions)
+    setShuffledVisualExam(null)
+    setAnswerKey(null)
   }
 
   function handleReset() {
@@ -64,9 +88,11 @@ export default function ExamShuffler() {
     setParsedExam(null)
     setShuffledExam(null)
     setAnswerKey(null)
+    setVisualQuestions(null)
+    setShuffledVisualExam(null)
   }
 
-  const showReset = parsedExam !== null || shuffledExam !== null
+  const showReset = parsedExam !== null || shuffledExam !== null || visualQuestions !== null || shuffledVisualExam !== null
 
   return (
     <>
@@ -76,7 +102,10 @@ export default function ExamShuffler() {
       </h1>
 
       {/* File upload */}
-      <FileUpload onExtracted={(t) => setRawText(t)} />
+      <FileUpload
+        onExtracted={(t) => setRawText(t)}
+        onVisualExtracted={handleVisualExtracted}
+      />
 
       {/* Quick-fill demo button */}
       <div className="mb-3 text-start">
@@ -135,22 +164,35 @@ export default function ExamShuffler() {
         )}
       </div>
 
-      {/* Parsed preview */}
+      {/* Parsed preview (text mode only) */}
       {parsedExam !== null && <ParsedExamPreview exam={parsedExam} />}
 
-      {/* Shuffled exam */}
+      {/* Shuffled exam — text mode */}
       {shuffledExam !== null && <ShuffledExamView exam={shuffledExam} />}
+
+      {/* Shuffled exam — visual mode */}
+      {shuffledVisualExam !== null && <VisualShuffledExamView exam={shuffledVisualExam} />}
 
       {/* Answer key */}
       {answerKey !== null && answerKey.length > 0 && <AnswerKeyTable rows={answerKey} />}
 
       {/* Export buttons */}
-      <ExportButtons shuffledExam={shuffledExam} answerKey={answerKey} />
+      <ExportButtons
+        shuffledExam={shuffledExam}
+        shuffledVisualExam={shuffledVisualExam}
+        answerKey={answerKey}
+      />
     </div>
 
     {shuffledExam && (
       <div className="print-only">
         <PrintableExam exam={shuffledExam} />
+      </div>
+    )}
+
+    {shuffledVisualExam && (
+      <div className="print-only">
+        <VisualPrintableExam exam={shuffledVisualExam} />
       </div>
     )}
     </>

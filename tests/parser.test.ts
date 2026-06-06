@@ -318,3 +318,98 @@ describe('parseExam — extended option labels (ז ח G H)', () => {
     expect(questions[0].options[7].originalLabel).toBe('H')
   })
 })
+
+import { diagnoseParsedExam } from '@/lib/parser/parseQuestions'
+
+describe('reversed question markers — parser fallback (RE_REVERSED_FULL)', () => {
+  it(':2 שאלה מספר → question 2 with options', () => {
+    const { questions } = parseExam(':2 שאלה מספר\nא. כן\nב. לא')
+    expect(questions).toHaveLength(1)
+    expect(questions[0].number).toBe(2)
+    expect(questions[0].options).toHaveLength(2)
+  })
+
+  it('2: שאלה מספר → question 2 (N: form)', () => {
+    const { questions } = parseExam('2: שאלה מספר\nא. כן\nב. לא')
+    expect(questions).toHaveLength(1)
+    expect(questions[0].number).toBe(2)
+    expect(questions[0].options).toHaveLength(2)
+  })
+
+  it(':5 שאלה מספר with inline text after marker', () => {
+    const { questions } = parseExam(':5 שאלה מספר מהו הפלט?\nא. 0\nב. 1')
+    expect(questions).toHaveLength(1)
+    expect(questions[0].number).toBe(5)
+  })
+
+  it('realistic PDF fixture: 5 reversed questions detected', () => {
+    const fixture = [
+      ':1 שאלה מספר',
+      'מהו הפלט של הפונקציה?',
+      'א. 0',
+      'ב. 1',
+      'ג. null',
+      'ד. undefined',
+      ':2 שאלה מספר',
+      'איזו מהשיטות מחזירה מחרוזת?',
+      'א. parseInt',
+      'ב. toString',
+      'ג. toFixed',
+      'ד. valueOf',
+      ':3 שאלה מספר',
+      'מה גודל int ב-Java?',
+      'א. 16 ביט',
+      'ב. 32 ביט',
+      'ג. 64 ביט',
+      'ד. 8 ביט',
+      ':4 שאלה מספר',
+      'מהי סיבוכיות Bubble Sort?',
+      'א. O(n)',
+      'ב. O(n log n)',
+      'ג. O(n²)',
+      'ד. O(log n)',
+      ':5 שאלה מספר',
+      'מה מציין HTTP status code 404?',
+      'א. שגיאת שרת',
+      'ב. בקשה תקינה',
+      'ג. משאב לא נמצא',
+      'ד. הפניה',
+    ].join('\n')
+
+    const { questions } = parseExam(fixture)
+    expect(questions).toHaveLength(5)
+    expect(questions.map(q => q.number)).toEqual([1, 2, 3, 4, 5])
+    for (const q of questions) {
+      expect(q.options).toHaveLength(4)
+    }
+  })
+})
+
+describe('diagnoseParsedExam', () => {
+  it('empty exam → zero counts', () => {
+    const diag = diagnoseParsedExam({ questions: [] })
+    expect(diag.parsedQuestionCount).toBe(0)
+    expect(diag.questionsWithFewerThanTwoOptions).toEqual([])
+    expect(diag.duplicateQuestionNumbers).toEqual([])
+    expect(diag.questionNumbers).toEqual([])
+  })
+
+  it('counts questions with fewer than 2 options', () => {
+    const { questions } = parseExam('1. שאלה\nא. רק אחד\n2. שאלה\nא. כן\nב. לא')
+    const diag = diagnoseParsedExam({ questions })
+    expect(diag.questionsWithFewerThanTwoOptions).toContain(1)
+    expect(diag.questionsWithFewerThanTwoOptions).not.toContain(2)
+  })
+
+  it('detects duplicate question numbers', () => {
+    // Two questions with the same number — happens when normalization is imperfect
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא\n1. שאלה\nא. כן\nב. לא')
+    const diag = diagnoseParsedExam({ questions })
+    expect(diag.duplicateQuestionNumbers).toContain(1)
+  })
+
+  it('parsedQuestionCount equals questions array length', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא\n2. שאלה\nא. כן\nב. לא')
+    expect(diagnoseParsedExam({ questions }).parsedQuestionCount).toBe(2)
+  })
+})

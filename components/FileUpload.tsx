@@ -4,26 +4,30 @@ import { useState, type ChangeEvent } from 'react'
 import { extractDocxText } from '@/lib/extract/extractDocx'
 import { extractPdfHybrid, type PdfMode } from '@/lib/extract/pdfEngine/extractPdfHybrid'
 import type { PdfExtractionQuality } from '@/lib/extract/extractPdf'
+import type { VisualExtractionResult, ComplexityFlags } from '@/lib/extract/pdfEngine/visualTypes'
 
 const PDF_MODE_LABELS: Record<PdfMode, string> = {
   auto: 'אוטומטי',
   fast: 'טקסט מהיר',
   ocr: 'OCR מקומי',
+  visual: 'נאמנות גבוהה',
 }
 
 interface Props {
   onExtracted: (text: string) => void
+  onVisualExtracted?: (result: VisualExtractionResult) => void
 }
 
 type Status = 'idle' | 'extracting' | 'done' | 'error'
 
-export default function FileUpload({ onExtracted }: Props) {
+export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
   const [status, setStatus] = useState<Status>('idle')
   const [fileName, setFileName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [previewText, setPreviewText] = useState('')
   const [quality, setQuality] = useState<PdfExtractionQuality | null>(null)
+  const [complexity, setComplexity] = useState<ComplexityFlags | null>(null)
   const [pdfMode, setPdfMode] = useState<PdfMode>('auto')
   const [ocrProgress, setOcrProgress] = useState<{ page: number; total: number; percent?: number } | null>(null)
   const [usedMode, setUsedMode] = useState<string | null>(null)
@@ -37,6 +41,7 @@ export default function FileUpload({ onExtracted }: Props) {
     setWarning(null)
     setPreviewText('')
     setQuality(null)
+    setComplexity(null)
     setOcrProgress(null)
     setUsedMode(null)
 
@@ -63,7 +68,29 @@ export default function FileUpload({ onExtracted }: Props) {
         setStatus('done')
         setPreviewText(result.text.slice(0, 300))
         onExtracted(result.text)
+
+      } else if (pdfMode === 'visual') {
+        // High-fidelity visual mode: bypass text pipeline
+        const { extractPdfVisual } = await import('@/lib/extract/pdfEngine/extractPdfVisual')
+        const visualResult = await extractPdfVisual(buffer, (page, total) => {
+          setOcrProgress({ page, total })
+        })
+        setOcrProgress(null)
+
+        if (visualResult.error) {
+          setStatus('error')
+          setError(visualResult.error)
+          return
+        }
+
+        if (visualResult.warning) setWarning(visualResult.warning)
+        setUsedMode('נאמנות גבוהה')
+        setStatus('done')
+        onVisualExtracted?.(visualResult)
+        onExtracted('')  // satisfies caller contract; ExamShuffler ignores empty string in visual mode
+
       } else {
+        // Text-based modes: fast / auto / ocr
         let ocrWasUsed = false
         const result = await extractPdfHybrid(buffer, pdfMode, (page, total, percent) => {
           ocrWasUsed = true
@@ -86,6 +113,7 @@ export default function FileUpload({ onExtracted }: Props) {
         setStatus('done')
         if (result.warning) setWarning(result.warning)
         if (result.quality) setQuality(result.quality)
+        setComplexity(result.complexity ?? null)
         setPreviewText(result.text.slice(0, 300))
         onExtracted(result.text)
       }
@@ -104,7 +132,7 @@ export default function FileUpload({ onExtracted }: Props) {
       <div className="mb-3">
         <p className="text-sm font-medium text-gray-700 mb-1">מצב עיבוד PDF:</p>
         <div className="flex gap-4 flex-wrap">
-          {(['auto', 'fast', 'ocr'] as PdfMode[]).map(m => (
+          {(['auto', 'fast', 'ocr', 'visual'] as PdfMode[]).map(m => (
             <label key={m} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-600">
               <input
                 type="radio"
@@ -119,7 +147,9 @@ export default function FileUpload({ onExtracted }: Props) {
           ))}
         </div>
         <p className="mt-1 text-xs text-gray-400">
-          טקסט מהיר מתאים ל-PDF טקסטואלי תקין. OCR מקומי איטי יותר אך יכול לעזור כשהחילוץ הרגיל נכשל. כל העיבוד מתבצע מקומית בדפדפן.
+          אוטומטי: מנסה טקסט, עובר ל-OCR בעת הצורך.
+          נאמנות גבוהה: שומר שאלות כתמונות — מומלץ לשאלות עם גרפים, טבלאות ותרשימים.
+          כל העיבוד מתבצע מקומית בדפדפן.
         </p>
       </div>
 
@@ -144,8 +174,9 @@ export default function FileUpload({ onExtracted }: Props) {
 
       {ocrProgress && (
         <p className="mt-2 text-sm text-blue-600" dir="rtl">
-          מריץ OCR על עמוד {ocrProgress.page} מתוך {ocrProgress.total}
-          {ocrProgress.percent != null ? ` (${ocrProgress.percent}%)` : ''}…
+          {pdfMode === 'visual'
+            ? `מעבד עמוד ${ocrProgress.page} מתוך ${ocrProgress.total}…`
+            : `מריץ OCR על עמוד ${ocrProgress.page} מתוך ${ocrProgress.total}${ocrProgress.percent != null ? ` (${ocrProgress.percent}%)` : ''}…`}
         </p>
       )}
 
@@ -170,6 +201,11 @@ export default function FileUpload({ onExtracted }: Props) {
           {(!quality.hasEnoughLineBreaks || quality.suspiciousJoinedWords > 5) && (
             <p className="text-amber-600 mt-1">
               נראה שחלוץ הטקסט חלקי — בדוק את תצוגת המקדימה וודא שהשאלות נראות תקין.
+            </p>
+          )}
+          {complexity && (complexity.hasImages || complexity.hasTables) && (
+            <p className="text-blue-600 mt-1">
+              זוהה מבנה מורכב — נסה מצב נאמנות גבוהה לשאלות עם גרפים וטבלאות
             </p>
           )}
         </div>

@@ -21,6 +21,9 @@ export interface ParsedExam {
   questions: ParsedQuestion[]
 }
 
+// Belt-and-suspenders fallback for reversed question markers not caught by pdfNormalize:
+// ":2 שאלה מספר" or "2: שאלה מספר" (RTL PDF extraction puts number first)
+const RE_REVERSED_FULL = /^:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*/
 // "שאלה מספר N" — handles optional colon variants: "שאלה מספר 2", "שאלה מספר:2", "שאלה מספר :2"
 // Must be tested before RE_HEBREW_SHORT
 const RE_HEBREW_FULL = /^שאלה\s+מספר\s*:?\s*(\d+)/
@@ -84,6 +87,12 @@ export function parseExam(rawText: string): ParsedExam {
     let questionNumber: number | null = null
     let questionInlineText: string | null = null
 
+    const mReversed = RE_REVERSED_FULL.exec(line)
+    if (mReversed) {
+      questionNumber = parseInt(mReversed[1], 10)
+      const rest = line.slice(mReversed[0].length).replace(/^[:\s]+/, '').trim()
+      questionInlineText = rest || null
+    } else {
     const mHebFull = RE_HEBREW_FULL.exec(line)
     if (mHebFull) {
       questionNumber = parseInt(mHebFull[1], 10)
@@ -116,6 +125,7 @@ export function parseExam(rawText: string): ParsedExam {
         }
       }
     }
+    } // end else (RE_REVERSED_FULL)
 
     if (questionNumber !== null) {
       if (currentOption !== null && currentQuestion !== null) {
@@ -166,4 +176,33 @@ export function parseExam(rawText: string): ParsedExam {
   }
 
   return { questions }
+}
+
+export interface ParseDiagnostics {
+  parsedQuestionCount: number
+  questionsWithFewerThanTwoOptions: number[]
+  suspiciousHugeBlocks: number[]
+  questionNumbers: number[]
+  duplicateQuestionNumbers: number[]
+}
+
+export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
+  const numbers = exam.questions.map(q => q.number)
+  const seen = new Set<number>()
+  const duplicates: number[] = []
+  for (const n of numbers) {
+    if (seen.has(n)) duplicates.push(n)
+    seen.add(n)
+  }
+  return {
+    parsedQuestionCount: exam.questions.length,
+    questionsWithFewerThanTwoOptions: exam.questions
+      .filter(q => q.options.length < 2)
+      .map(q => q.number),
+    suspiciousHugeBlocks: exam.questions
+      .filter(q => q.questionText.length > 500)
+      .map(q => q.number),
+    questionNumbers: numbers,
+    duplicateQuestionNumbers: [...new Set(duplicates)],
+  }
 }

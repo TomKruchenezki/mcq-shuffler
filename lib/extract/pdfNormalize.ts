@@ -1,6 +1,7 @@
 // Known header/footer patterns found in Hebrew university exam PDFs.
 const HEADER_FOOTER_PATTERNS: RegExp[] = [
   /עמוד\s+\d+\s+מתוך\s+\d+/,
+  /עמוד\s*\d+\s*מתוך\s*\d+/, // no-space variant (catches "עמוד5מתוך11")
   /מבחן\s+מס[''']?\s*\d*/,
   /קוד\s+מבחן/,
   /בן\s+גוריון/,
@@ -11,17 +12,36 @@ const HEADER_FOOTER_PATTERNS: RegExp[] = [
 // "text content .א" → normalise to "א. text content"
 const RE_FLIPPED_OPTION = /^(.+?)\s+\.([א-ת])\s*$/
 
+// Reversed question marker at line START: ":2 שאלה מספר" or "2: שאלה מספר"
+// (?::\s+|\s+) matches EITHER "colon+space" (N: form) OR just "space" (:N form)
+const RE_REVERSED_START = /^:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*(.*)/
+// Reversed question marker MID-LINE (non-empty prefix before it)
+const RE_REVERSED_MID = /^(.+?)\s+:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*(.*)/
+
+// Hebrew↔digit boundary spacing
+const RE_HEB_DIGIT = /([א-ת])(\d)/g
+const RE_DIGIT_HEB = /(\d)([א-ת])/g
+
 /**
  * Removes repeated headers/footers across pages and normalises RTL-flipped option
- * labels. Returns one cleaned string per page.
+ * labels and reversed question markers. Returns one cleaned string per page.
  */
 export function normalizePdfText(pages: string[]): string[] {
   if (pages.length === 0) return []
 
-  // Build a map from trimmed line → set of page indices it appears on
+  // Phase 1: apply digit-Hebrew spacing and reversed-marker normalization per line.
+  // This runs before header detection so that "עמוד5מתוך11" becomes "עמוד 5 מתוך 11"
+  // (matched by the header pattern) and ":2 שאלה מספר" becomes "שאלה מספר 2" (protected).
+  const preProcessed: string[][] = pages.map(page =>
+    page
+      .split('\n')
+      .flatMap(line => splitAndNormalizeReversedMarkers(fixDigitHebrewSpacing(line)))
+  )
+
+  // Phase 2: build map from pre-processed trimmed line → set of page indices
   const linePageMap = new Map<string, Set<number>>()
-  for (let pi = 0; pi < pages.length; pi++) {
-    for (const line of pages[pi].split('\n')) {
+  for (let pi = 0; pi < preProcessed.length; pi++) {
+    for (const line of preProcessed[pi]) {
       const t = line.trim()
       if (!t) continue
       if (!linePageMap.has(t)) linePageMap.set(t, new Set())
@@ -29,20 +49,45 @@ export function normalizePdfText(pages: string[]): string[] {
     }
   }
 
-  // Determine which lines are headers or footers
+  // Phase 3: determine headers from pre-processed content
   const headerFooterLines = new Set<string>()
   for (const [line, pageSet] of linePageMap) {
     if (isHeaderOrFooter(line, pageSet.size)) headerFooterLines.add(line)
   }
 
-  // Filter and normalise each page
-  return pages.map(page =>
-    page
-      .split('\n')
+  // Phase 4: filter headers and normalize option labels
+  return preProcessed.map(lines =>
+    lines
       .filter(line => !headerFooterLines.has(line.trim()))
       .map(normalizeOptionLabel)
       .join('\n'),
   )
+}
+
+function fixDigitHebrewSpacing(line: string): string {
+  return line.replace(RE_HEB_DIGIT, '$1 $2').replace(RE_DIGIT_HEB, '$1 $2')
+}
+
+function splitAndNormalizeReversedMarkers(line: string): string[] {
+  const t = line.trim()
+
+  const mStart = RE_REVERSED_START.exec(t)
+  if (mStart) {
+    const num = mStart[1]
+    const rest = mStart[2].replace(/^[:\s]+/, '').trim()
+    return rest ? [`שאלה מספר ${num}`, rest] : [`שאלה מספר ${num}`]
+  }
+
+  const mMid = RE_REVERSED_MID.exec(t)
+  if (mMid) {
+    const prefix = mMid[1].trim()
+    const num = mMid[2]
+    const suffix = mMid[3].replace(/^[:\s]+/, '').trim()
+    const qLine = suffix ? `שאלה מספר ${num} ${suffix}` : `שאלה מספר ${num}`
+    return prefix ? [prefix, qLine] : [qLine]
+  }
+
+  return [t || line]
 }
 
 function isHeaderOrFooter(line: string, pageCount: number): boolean {

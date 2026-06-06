@@ -2,11 +2,13 @@
 
 import { useState } from 'react'
 import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
+import type { ShuffledVisualExam } from '@/lib/extract/pdfEngine/visualTypes'
 import { exportDocx } from '@/lib/export/exportDocx'
 import { exportCsv } from '@/lib/export/exportCsv'
 
 interface Props {
   shuffledExam: ShuffledExam | null
+  shuffledVisualExam?: ShuffledVisualExam | null
   answerKey: AnswerKeyRow[] | null
 }
 
@@ -19,9 +21,12 @@ function triggerDownload(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url)
 }
 
-export default function ExportButtons({ shuffledExam, answerKey }: Props) {
+export default function ExportButtons({ shuffledExam, shuffledVisualExam, answerKey }: Props) {
   const [error, setError] = useState<string | null>(null)
-  const disabled = shuffledExam === null
+
+  const hasAnyExam = shuffledExam !== null || (shuffledVisualExam != null && shuffledVisualExam !== null)
+  const isVisualMode = shuffledVisualExam != null && shuffledVisualExam !== null
+  const disabled = !hasAnyExam
 
   async function handleDocx() {
     if (!shuffledExam) return
@@ -60,11 +65,17 @@ export default function ExportButtons({ shuffledExam, answerKey }: Props) {
       <button
         type="button"
         onClick={handleDocx}
-        disabled={disabled}
+        disabled={disabled || isVisualMode}
+        title={isVisualMode ? 'ייצוא Word אינו זמין במצב נאמנות גבוהה — השתמש ב-PDF' : undefined}
         className="px-5 py-2 rounded-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
       >
         הורד מבחן כ-Word
       </button>
+      {isVisualMode && (
+        <p className="w-full text-xs text-amber-600 mt-0" dir="rtl">
+          ייצוא Word אינו זמין במצב נאמנות גבוהה — השתמש ב-PDF
+        </p>
+      )}
       <button
         type="button"
         onClick={handleCsv}
@@ -81,7 +92,7 @@ export default function ExportButtons({ shuffledExam, answerKey }: Props) {
       >
         הורד מבחן כ-PDF
       </button>
-      {!disabled && (
+      {hasAnyExam && (
         <p className="w-full text-sm text-gray-500 mt-1">
           הדפדפן יפתח חלון הדפסה — בחר &quot;שמירה כ-PDF&quot;.
         </p>

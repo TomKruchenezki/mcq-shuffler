@@ -1,6 +1,7 @@
 import type { TextItem, PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api'
 import { reconstructPageText } from './pdfLines'
 import { normalizePdfText } from './pdfNormalize'
+import type { ComplexityFlags } from './pdfEngine/visualTypes'
 
 export interface PdfExtractionQuality {
   pages: number
@@ -17,6 +18,7 @@ export interface PdfExtractionResult {
   warning?: string
   error?: string
   quality?: PdfExtractionQuality
+  complexity?: ComplexityFlags
 }
 
 const SCANNED_THRESHOLD = 100

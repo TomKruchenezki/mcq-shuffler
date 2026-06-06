@@ -1,4 +1,5 @@
 import type { ParsedExam } from '@/lib/parser/parseQuestions'
+import { diagnoseParsedExam } from '@/lib/parser/parseQuestions'
 
 interface Props {
   exam: ParsedExam
@@ -15,9 +16,21 @@ export default function ParsedExamPreview({ exam }: Props) {
     )
   }
 
+  const diag = diagnoseParsedExam(exam)
+
   return (
     <section className="my-6 space-y-4" dir="rtl">
       <h2 className="text-xl font-bold text-gray-800">תוצאות ניתוח — {count} שאלות</h2>
+      {diag.duplicateQuestionNumbers.length > 0 && (
+        <p className="text-amber-600 text-sm" role="alert">
+          ⚠ מספרי שאלות כפולים: {diag.duplicateQuestionNumbers.join(', ')}
+        </p>
+      )}
+      {diag.questionsWithFewerThanTwoOptions.length > 1 && (
+        <p className="text-amber-600 text-sm" role="alert">
+          ⚠ {diag.questionsWithFewerThanTwoOptions.length} שאלות עם פחות מ-2 תשובות
+        </p>
+      )}
       {exam.questions.map(q => (
         <article key={q.number} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <p dir="rtl" className="font-semibold text-gray-800 leading-relaxed">

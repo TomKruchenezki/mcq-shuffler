@@ -1,8 +1,36 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import ExamShuffler from '@/components/ExamShuffler'
+import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes'
+
+const { capturedProps } = vi.hoisted(() => ({
+  capturedProps: { current: null as { onVisualExtracted?: (r: VisualExtractionResult) => void } | null },
+}))
+
+vi.mock('@/components/FileUpload', () => ({
+  default: (props: any) => {
+    capturedProps.current = props
+    return <div data-testid="mock-file-upload" />
+  },
+}))
 
 const SAMPLE = `1. שאלה\nא. ראשון\nב. שני\nג. שלישי\nד. רביעי`
+
+function makeVisualResult(): VisualExtractionResult {
+  return {
+    visualQuestions: [
+      {
+        number: 1,
+        stemDataUrl: 'data:,stem',
+        options: [
+          { originalIndex: 0, isOriginalCorrectAnswer: true, dataUrl: 'data:,optA', labelBox: { pdfRect: { x: 50, y: 100, width: 20, height: 12 }, labelChar: 'א' }, approximateText: 'א' },
+          { originalIndex: 1, isOriginalCorrectAnswer: false, dataUrl: 'data:,optB', labelBox: { pdfRect: { x: 50, y: 80, width: 20, height: 12 }, labelChar: 'ב' }, approximateText: 'ב' },
+        ],
+        pageIndex: 0,
+      },
+    ],
+  }
+}
 
 const MIXED = `1. הפונקציה getUserName מחזירה user_id=123\nא. string תקין\nב. null\nג. Exception\nד. number`
 
@@ -11,6 +39,10 @@ function getTextarea(): HTMLTextAreaElement {
 }
 
 describe('ExamShuffler', () => {
+  beforeEach(() => {
+    capturedProps.current = null
+  })
+
   it('renders Hebrew title', () => {
     render(<ExamShuffler />)
     expect(screen.getByText('מערבל תשובות אמריקאיות')).toBeInTheDocument()
@@ -98,6 +130,43 @@ describe('ExamShuffler', () => {
     fireEvent.click(screen.getByRole('button', { name: 'נתח מבחן' }))
     fireEvent.click(screen.getByRole('button', { name: 'נקה הכל' }))
     expect(getTextarea().value).toBe('')
+  })
+
+  it('shuffle button becomes enabled after onVisualExtracted fires', async () => {
+    render(<ExamShuffler />)
+    expect(screen.getByRole('button', { name: 'ערבב תשובות' })).toBeDisabled()
+
+    await act(async () => {
+      capturedProps.current?.onVisualExtracted?.(makeVisualResult())
+    })
+
+    expect(screen.getByRole('button', { name: 'ערבב תשובות' })).not.toBeDisabled()
+  })
+
+  it('after visual shuffle, "נאמנות גבוהה" badge appears', async () => {
+    render(<ExamShuffler />)
+
+    await act(async () => {
+      capturedProps.current?.onVisualExtracted?.(makeVisualResult())
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'ערבב תשובות' }))
+    // Badge exact text from VisualShuffledExamView
+    expect(screen.getByText('מצב: נאמנות גבוהה')).toBeInTheDocument()
+  })
+
+  it('reset clears visual state — badge disappears', async () => {
+    render(<ExamShuffler />)
+
+    await act(async () => {
+      capturedProps.current?.onVisualExtracted?.(makeVisualResult())
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'ערבב תשובות' }))
+    expect(screen.getByText('מצב: נאמנות גבוהה')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'נקה הכל' }))
+    expect(screen.queryByText('מצב: נאמנות גבוהה')).not.toBeInTheDocument()
   })
 
   it('quick-fill button populates textarea with sample text', () => {
