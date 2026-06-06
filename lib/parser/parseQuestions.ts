@@ -29,8 +29,8 @@ const RE_HEBREW_SHORT = /^שאלה\s+(\d+)/
 const RE_PERIOD = /^(\d+)\.(?:\s+(.+)|\s*$)/
 // "N) text" or "N)" alone
 const RE_PAREN = /^(\d+)\)(?:\s+(.+)|\s*$)/
-// Hebrew א–ה (U+05D0–U+05D4) or Latin A–E, with . or ) delimiter
-const RE_OPTION = /^([א-ה]|[A-E])[.)]\s*(.*)/
+// Hebrew א–ת (full alphabet) or Latin A–Z, with . or ) delimiter
+const RE_OPTION = /^([א-ת]|[A-Z])[.)]\s*(.*)/
 
 interface AccOption {
   label: string

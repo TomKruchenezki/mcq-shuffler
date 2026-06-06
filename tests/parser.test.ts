@@ -266,3 +266,55 @@ describe('parseExam — multiple questions', () => {
     expect(questions[1].number).toBe(11)
   })
 })
+
+describe('parseExam — extended option labels (ז ח G H)', () => {
+  const makeQ = (optLines: string) => `1. שאלה\n${optLines}`
+
+  it('Hebrew ז. label', () => {
+    const { questions } = parseExam(makeQ('א. א\nב. ב\nג. ג\nד. ד\nה. ה\nו. ו\nז. שביעי'))
+    expect(questions[0].options).toHaveLength(7)
+    expect(questions[0].options[6].originalLabel).toBe('ז')
+    expect(questions[0].options[6].text).toBe('שביעי')
+  })
+
+  it('Hebrew ח. label', () => {
+    const { questions } = parseExam(makeQ('א. א\nב. ב\nג. ג\nד. ד\nה. ה\nו. ו\nז. ז\nח. שמיני'))
+    expect(questions[0].options).toHaveLength(8)
+    expect(questions[0].options[7].originalLabel).toBe('ח')
+    expect(questions[0].options[7].text).toBe('שמיני')
+  })
+
+  it('Hebrew ז) label', () => {
+    const { questions } = parseExam(makeQ('א) א\nב) ב\nג) ג\nד) ד\nה) ה\nו) ו\nז) שביעי'))
+    expect(questions[0].options[6].originalLabel).toBe('ז')
+  })
+
+  it('Hebrew ח) label', () => {
+    const { questions } = parseExam(makeQ('א) א\nב) ב\nג) ג\nד) ד\nה) ה\nו) ו\nז) ז\nח) שמיני'))
+    expect(questions[0].options[7].originalLabel).toBe('ח')
+  })
+
+  it('English G. label', () => {
+    const { questions } = parseExam(makeQ('A. a\nB. b\nC. c\nD. d\nE. e\nF. f\nG. seventh'))
+    expect(questions[0].options).toHaveLength(7)
+    expect(questions[0].options[6].originalLabel).toBe('G')
+    expect(questions[0].options[6].text).toBe('seventh')
+  })
+
+  it('English H. label', () => {
+    const { questions } = parseExam(makeQ('A. a\nB. b\nC. c\nD. d\nE. e\nF. f\nG. g\nH. eighth'))
+    expect(questions[0].options).toHaveLength(8)
+    expect(questions[0].options[7].originalLabel).toBe('H')
+    expect(questions[0].options[7].text).toBe('eighth')
+  })
+
+  it('English G) label', () => {
+    const { questions } = parseExam(makeQ('A) a\nB) b\nC) c\nD) d\nE) e\nF) f\nG) seventh'))
+    expect(questions[0].options[6].originalLabel).toBe('G')
+  })
+
+  it('English H) label', () => {
+    const { questions } = parseExam(makeQ('A) a\nB) b\nC) c\nD) d\nE) e\nF) f\nG) g\nH) eighth'))
+    expect(questions[0].options[7].originalLabel).toBe('H')
+  })
+})
