@@ -177,3 +177,18 @@ modified or reversed.
 
 **`.claude/agents/`** — Three project-specific subagents: `mcq-core-engineer` (core logic invariants),
 `hebrew-rtl-reviewer` (RTL and text fidelity), `qa-verifier` (test coverage and build health).
+
+**`.claude/skills/pdf-extraction-qa/SKILL.md`** — PDF extraction QA checklist. Invoke
+whenever changing `lib/extract/` files. Covers coordinate-based extraction rules, Hebrew RTL
+gap formulas, quality scoring, OCR constraints, visual preservation, and test verification.
+
+**`.claude/agents/pdf-extraction-engineer.md`** — coordinate-aware PDF extraction work
+(`pdfLines.ts`, `pdfNormalize.ts`, `extractPdf.ts`). Enforces gap formulas, y-grouping,
+header removal safety, and quality scoring.
+
+**`.claude/agents/ocr-browser-engineer.md`** — browser-side OCR for scanned PDFs.
+Enforces local/browser-only OCR (no backend, no cloud, no paid AI), scanned-detection gating,
+and pipeline integration.
+
+**`.claude/agents/pdf-visual-preservation-reviewer.md`** — read-only reviewer for question
+text, option text, and mixed Hebrew-English-SQL content fidelity after PDF extraction or OCR changes.

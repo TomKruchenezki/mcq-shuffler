@@ -29,6 +29,21 @@ These apply to every UI component, parser, and export module.
 
 ---
 
+## PDF Extraction Strategy
+
+These apply to every change in `lib/extract/`.
+
+| Rule |
+|---|
+| Never join pdfjs TextItems with `.join('')` — always use coordinate-aware reconstruction. |
+| RTL gap: `(prev.x - prev.width) - curr.x`; LTR gap: `curr.x - (prev.x + prev.width)`. |
+| `Y_TOLERANCE = 3.0`; `SPACE_THRESHOLD_FACTOR = 0.25`. Do not change without updating tests. |
+| Header/footer safety guard: never remove lines starting with `שאלה`, `\d+.`, `.[א-ת]`, or `[א-ת][.)]`. |
+| OCR must be local/browser-only (Tesseract.js WASM). No backend, no cloud, no paid AI. |
+| Real exam PDFs go in `manual-fixtures/` (gitignored). Never commit them. |
+
+---
+
 ## Privacy Rules
 
 | Rule |
@@ -78,6 +93,9 @@ npm run build        # static export to out/
 | `mcq-core-engineer` | Parser contracts, shuffle logic, answer key, invariant review, Step 4+ |
 | `hebrew-rtl-reviewer` | Any change touching Hebrew text, RTL rendering, parser text, UI, or export |
 | `qa-verifier` | Before completing each step — tests, typecheck, coverage audit |
+| `pdf-extraction-engineer` | Any change to `lib/extract/` — pdfLines, pdfNormalize, extractPdf |
+| `ocr-browser-engineer` | When implementing browser-side OCR for scanned PDFs |
+| `pdf-visual-preservation-reviewer` | After any PDF/OCR changes — verify text fidelity |
 
 ---
 

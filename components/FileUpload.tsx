@@ -2,7 +2,7 @@
 
 import { useState, type ChangeEvent } from 'react'
 import { extractDocxText } from '@/lib/extract/extractDocx'
-import { extractPdfText } from '@/lib/extract/extractPdf'
+import { extractPdfText, type PdfExtractionQuality } from '@/lib/extract/extractPdf'
 
 interface Props {
   onExtracted: (text: string) => void
@@ -16,6 +16,7 @@ export default function FileUpload({ onExtracted }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
   const [previewText, setPreviewText] = useState('')
+  const [quality, setQuality] = useState<PdfExtractionQuality | null>(null)
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -25,6 +26,7 @@ export default function FileUpload({ onExtracted }: Props) {
     setError(null)
     setWarning(null)
     setPreviewText('')
+    setQuality(null)
 
     const ext = file.name.split('.').pop()?.toLowerCase()
 
@@ -58,6 +60,7 @@ export default function FileUpload({ onExtracted }: Props) {
         }
         setStatus('done')
         if (result.warning) setWarning(result.warning)
+        if (result.quality) setQuality(result.quality)
         setPreviewText(result.text.slice(0, 300))
         onExtracted(result.text)
       }
@@ -102,6 +105,19 @@ export default function FileUpload({ onExtracted }: Props) {
         <p role="alert" className="mt-2 text-sm text-amber-600">
           {warning}
         </p>
+      )}
+
+      {quality && (
+        <div className="mt-2 text-xs text-gray-500 space-y-0.5" dir="rtl">
+          <span className="inline-block ml-3">עמודים: {quality.pages}</span>
+          <span className="inline-block ml-3">שאלות שזוהו: {quality.detectedQuestionMarkers}</span>
+          <span className="inline-block ml-3">תשובות שזוהו: {quality.detectedOptionMarkers}</span>
+          {(!quality.hasEnoughLineBreaks || quality.suspiciousJoinedWords > 5) && (
+            <p className="text-amber-600 mt-1">
+              נראה שחלוץ הטקסט חלקי — בדוק את תצוגת המקדימה וודא שהשאלות נראות תקין.
+            </p>
+          )}
+        </div>
       )}
 
       {previewText && (

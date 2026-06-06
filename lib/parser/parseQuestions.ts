@@ -21,14 +21,17 @@ export interface ParsedExam {
   questions: ParsedQuestion[]
 }
 
-// "שאלה מספר N" — must be tested before RE_HEBREW_SHORT
-const RE_HEBREW_FULL = /^שאלה\s+מספר\s+(\d+)/
+// "שאלה מספר N" — handles optional colon variants: "שאלה מספר 2", "שאלה מספר:2", "שאלה מספר :2"
+// Must be tested before RE_HEBREW_SHORT
+const RE_HEBREW_FULL = /^שאלה\s+מספר\s*:?\s*(\d+)/
 // "שאלה N"
 const RE_HEBREW_SHORT = /^שאלה\s+(\d+)/
 // "N. text" or "N." alone — requires \s+ before inline text to avoid matching 1.5
 const RE_PERIOD = /^(\d+)\.(?:\s+(.+)|\s*$)/
 // "N) text" or "N)" alone
 const RE_PAREN = /^(\d+)\)(?:\s+(.+)|\s*$)/
+// ".N" — RTL/PDF-flipped period-number, e.g. ".2" at start of line
+const RE_RTL_PERIOD = /^\.(\d+)\b/
 // Hebrew א–ת (full alphabet) or Latin A–Z, with . or ) delimiter
 const RE_OPTION = /^([א-ת]|[A-Z])[.)]\s*(.*)/
 
@@ -84,7 +87,8 @@ export function parseExam(rawText: string): ParsedExam {
     const mHebFull = RE_HEBREW_FULL.exec(line)
     if (mHebFull) {
       questionNumber = parseInt(mHebFull[1], 10)
-      const rest = line.slice(mHebFull[0].length).trim()
+      // Strip leading colon/spaces to handle "שאלה מספר 2: text"
+      const rest = line.slice(mHebFull[0].length).replace(/^[:\s]+/, '').trim()
       questionInlineText = rest || null
     } else {
       const mHebShort = RE_HEBREW_SHORT.exec(line)
@@ -102,6 +106,12 @@ export function parseExam(rawText: string): ParsedExam {
           if (mParen) {
             questionNumber = parseInt(mParen[1], 10)
             questionInlineText = (mParen[2] ?? '').trim() || null
+          } else {
+            const mRtlPeriod = RE_RTL_PERIOD.exec(line)
+            if (mRtlPeriod) {
+              questionNumber = parseInt(mRtlPeriod[1], 10)
+              questionInlineText = null
+            }
           }
         }
       }
