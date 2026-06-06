@@ -8,6 +8,7 @@ import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
 import ParsedExamPreview from './ParsedExamPreview'
 import ShuffledExamView from './ShuffledExamView'
 import AnswerKeyTable from './AnswerKeyTable'
+import ExportButtons from './ExportButtons'
 
 const SAMPLE_EXAM_TEXT = `1. מה מחזירה הפונקציה getUserName כאשר user_id=123?
 א. היא מחזירה string תקין
@@ -136,6 +137,9 @@ export default function ExamShuffler() {
 
       {/* Answer key */}
       {answerKey !== null && answerKey.length > 0 && <AnswerKeyTable rows={answerKey} />}
+
+      {/* Export buttons */}
+      <ExportButtons shuffledExam={shuffledExam} answerKey={answerKey} />
     </div>
   )
 }
