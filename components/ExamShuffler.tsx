@@ -10,6 +10,7 @@ import ShuffledExamView from './ShuffledExamView'
 import AnswerKeyTable from './AnswerKeyTable'
 import ExportButtons from './ExportButtons'
 import FileUpload from './FileUpload'
+import PrintableExam from './PrintableExam'
 
 const SAMPLE_EXAM_TEXT = `1. מה מחזירה הפונקציה getUserName כאשר user_id=123?
 א. היא מחזירה string תקין
@@ -68,7 +69,8 @@ export default function ExamShuffler() {
   const showReset = parsedExam !== null || shuffledExam !== null
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8" dir="rtl">
+    <>
+    <div className="max-w-3xl mx-auto px-4 py-8 no-print" dir="rtl">
       <h1 className="text-3xl font-bold text-center mb-8 text-gray-900">
         מערבל תשובות אמריקאיות
       </h1>
@@ -145,5 +147,12 @@ export default function ExamShuffler() {
       {/* Export buttons */}
       <ExportButtons shuffledExam={shuffledExam} answerKey={answerKey} />
     </div>
+
+    {shuffledExam && (
+      <div className="print-only">
+        <PrintableExam exam={shuffledExam} />
+      </div>
+    )}
+    </>
   )
 }

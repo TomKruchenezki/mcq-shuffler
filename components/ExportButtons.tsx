@@ -46,6 +46,10 @@ export default function ExportButtons({ shuffledExam, answerKey }: Props) {
     }
   }
 
+  function handlePdf() {
+    window.print()
+  }
+
   return (
     <div className="my-4 flex gap-3 flex-wrap items-center" dir="rtl">
       {error && (
@@ -69,6 +73,19 @@ export default function ExportButtons({ shuffledExam, answerKey }: Props) {
       >
         הורד מפתח תשובות כ-CSV
       </button>
+      <button
+        type="button"
+        onClick={handlePdf}
+        disabled={disabled}
+        className="px-5 py-2 rounded-lg font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+      >
+        הורד מבחן כ-PDF
+      </button>
+      {!disabled && (
+        <p className="w-full text-sm text-gray-500 mt-1">
+          הדפדפן יפתח חלון הדפסה — בחר &quot;שמירה כ-PDF&quot;.
+        </p>
+      )}
     </div>
   )
 }

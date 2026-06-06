@@ -26,3 +26,30 @@ pre {
   direction: ltr;
   text-align: left;
 }
+
+/* Hidden on screen; shown only during print */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+
+  @page { margin: 2cm; }
+
+  main { padding: 0; }
+
+  .printable-exam {
+    direction: rtl;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 12pt;
+    line-height: 1.6;
+  }
+
+  .printable-question {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1.2rem;
+  }
+}

@@ -63,7 +63,7 @@ describe('ExamShuffler', () => {
     fireEvent.change(getTextarea(), { target: { value: SAMPLE } })
     fireEvent.click(screen.getByRole('button', { name: 'נתח מבחן' }))
     fireEvent.click(screen.getByRole('button', { name: 'ערבב תשובות' }))
-    expect(screen.getByText('מבחן מעורבב')).toBeInTheDocument()
+    expect(screen.getAllByText('מבחן מעורבב').length).toBeGreaterThan(0)
   })
 
   it('shows answer key heading after shuffling', () => {

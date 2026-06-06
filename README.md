@@ -82,6 +82,17 @@ After building and opening the app locally, verify each path:
 3. **Upload text-based PDF** — prepare a `.pdf` created from a Word doc (not scanned). Upload it. Extracted text preview appears; parse → shuffle → export DOCX/CSV should work end-to-end.
 4. **Upload scanned PDF** — prepare a scanned or image-only PDF. After upload, the amber warning "נראה שה-PDF סרוק או שהטקסט לא חולץ טוב. מומלץ להשתמש בקובץ Word אם אפשר." should appear.
 
+### PDF export (Step 7.5)
+
+5. After shuffling, click "הורד מבחן כ-PDF".
+6. In the browser print dialog, choose "Save as PDF".
+7. Open the saved PDF and verify:
+   - Hebrew is right-to-left
+   - English / SQL / numbers / formulas remain readable
+   - Answer order is shuffled (not original)
+   - Answer key is NOT included
+   - App UI (textarea, buttons, upload area) is NOT included
+
 ## Project guidance
 
 **`CLAUDE.md`** (project root) — Project purpose, core invariants, RTL rules, privacy rules,
