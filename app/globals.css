@@ -4,5 +4,25 @@
 
 body {
   direction: rtl;
+  text-align: start;
   font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Inline LTR island — use on a <span> when an embedded token inside Hebrew text mis-renders */
+.ltr-isolate {
+  unicode-bidi: isolate;
+  direction: ltr;
+}
+
+/* Code elements are always LTR regardless of surrounding RTL context */
+code, kbd, samp {
+  unicode-bidi: isolate;
+  direction: ltr;
+  font-family: 'Courier New', Consolas, monospace;
+}
+
+pre {
+  unicode-bidi: isolate;
+  direction: ltr;
+  text-align: left;
 }
