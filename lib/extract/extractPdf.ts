@@ -6,6 +6,7 @@ export interface PdfExtractionResult {
   error?: string
 }
 
+// Heuristic: fewer than 100 chars of extracted text likely means a scanned/image PDF
 const SCANNED_THRESHOLD = 100
 
 export async function extractPdfText(buffer: ArrayBuffer): Promise<PdfExtractionResult> {

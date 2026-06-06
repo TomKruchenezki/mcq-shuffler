@@ -19,3 +19,6 @@ npm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local exam files for manual testing (never commit real exams)
+/manual-fixtures/

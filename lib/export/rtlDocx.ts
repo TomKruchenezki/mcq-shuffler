@@ -9,7 +9,7 @@ export function rtlParagraph(
 ): Paragraph {
   return new Paragraph({
     children: [
-      new TextRun({ text, bold: options?.bold, size: options?.size }),
+      new TextRun({ text, bold: options?.bold, size: options?.size, language: { bidirectional: 'he-IL' } }),
     ],
     alignment: AlignmentType.RIGHT,
     bidirectional: true,

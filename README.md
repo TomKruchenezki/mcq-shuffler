@@ -5,12 +5,13 @@ No backend. No APIs. Files are processed locally in the browser.
 
 **Live site:** https://tomkruchenezki.github.io/mcq-shuffler/
 
-## Features (planned)
+## Features
 
-- Upload DOCX or text-based PDF Hebrew exams
+- Upload DOCX or text-based PDF Hebrew exams, or paste text directly
+- Reconstruct Word automatic numbered lists (question numbers + Hebrew labels א. ב. ג.)
 - Shuffle answer options per question independently
 - Track the correct answer (always option A in the original) → generate an answer key
-- Export the shuffled exam as DOCX
+- Export the shuffled exam as DOCX, answer key as CSV, or print to PDF
 - Full Hebrew RTL with mixed English, numbers, code, SQL, and formulas
 
 ## Local development
@@ -71,27 +72,98 @@ You can also trigger it manually from **Actions → Deploy to GitHub Pages → R
 ## Tech stack
 
 Next.js 15 · React 19 · TypeScript · Tailwind CSS · Vitest  
-mammoth (DOCX extraction) · pdfjs-dist (PDF extraction) · docx (DOCX generation)
+mammoth (DOCX extraction) · pdfjs-dist (PDF extraction) · docx (DOCX generation) · jszip (DOCX parsing)
 
-## Manual Verification (Step 7 — file upload)
+## Privacy
 
-After building and opening the app locally, verify each path:
+All processing happens locally in your browser.
 
-1. **Paste text** — click "טען דוגמה", then "נתח מבחן". Three questions should appear in the parse preview.
-2. **Upload DOCX** — prepare any `.docx` file with Hebrew MCQ questions. Click "בחר קובץ", select the file. The file name and a short text preview should appear. Click "נתח מבחן" — questions should parse normally.
-3. **Upload text-based PDF** — prepare a `.pdf` created from a Word doc (not scanned). Upload it. Extracted text preview appears; parse → shuffle → export DOCX/CSV should work end-to-end.
-4. **Upload scanned PDF** — prepare a scanned or image-only PDF. After upload, the amber warning "נראה שה-PDF סרוק או שהטקסט לא חולץ טוב. מומלץ להשתמש בקובץ Word אם אפשר." should appear.
+- Uploaded files are read into memory and processed client-side — they are never sent to any server.
+- No backend, no database, no external APIs.
+- No AI or cloud services are used.
+- No analytics or tracking of any kind.
+- Closing the tab discards everything.
 
-### PDF export (Step 7.5)
+## Manual QA Checklist
 
-5. After shuffling, click "הורד מבחן כ-PDF".
-6. In the browser print dialog, choose "Save as PDF".
-7. Open the saved PDF and verify:
-   - Hebrew is right-to-left
-   - English / SQL / numbers / formulas remain readable
-   - Answer order is shuffled (not original)
-   - Answer key is NOT included
-   - App UI (textarea, buttons, upload area) is NOT included
+Run these checks before deploying or releasing.
+
+### Paste text
+- [ ] Click "טען דוגמה" → "נתח מבחן" → 3 questions appear in the parse preview
+- [ ] Shuffle → answer key table appears with original first option marked correct
+- [ ] Export Word — file downloads and opens with RTL text
+- [ ] Export CSV — file downloads and opens in Excel with Hebrew column headers
+- [ ] Export PDF — browser print dialog opens; save as PDF; output is RTL with no app UI
+
+### DOCX upload
+- [ ] Upload a DOCX that uses Word automatic numbered lists (e.g. InfoSystems_MoedA_2025.docx)
+- [ ] Questions and Hebrew option labels (א. ב. ג.) appear correctly in the parse preview
+- [ ] Shuffle → export Word/CSV/PDF all work
+
+### PDF upload
+- [ ] Upload a text-based PDF (exported from Word, not scanned) → questions parse correctly
+- [ ] Upload a scanned or image-only PDF → amber warning appears in the upload area
+
+### Answer option counts
+- [ ] Exam with 2 options per question → shuffles and exports correctly
+- [ ] Exam with 4 options (standard) → works
+- [ ] Exam with 6 options → works, labels reach ו
+- [ ] Exam with 8 options → works, labels reach ח
+
+### Exports
+- [ ] Word export: text is right-to-left, Hebrew labels on right, no answer key
+- [ ] CSV export: opens in Excel without garbled Hebrew (UTF-8 BOM present)
+- [ ] PDF print: app UI hidden, exam text only, Hebrew RTL, SQL/English readable left-to-right
+
+### Edge cases
+- [ ] Mixed Hebrew + English + numbers + SQL in a question → text not reversed or garbled
+- [ ] Empty textarea → "נתח מבחן" button is disabled
+- [ ] No shuffled exam yet → all three export buttons are disabled
+- [ ] "נקה הכל" resets all state and clears preview
+
+## Troubleshooting
+
+**"לא זוהו שאלות" (no questions detected)**  
+The parser expects question numbers (`1.`, `2.`, or `שאלה 1`) and Hebrew option labels
+(`א.`, `ב.`). If your DOCX uses Word automatic numbering, the app reconstructs these
+labels automatically. If you see this error, try pasting the text manually from Word
+and check that each question starts with a number and each option starts with `א.` etc.
+
+**"PDF סרוק" warning appears after upload**  
+The PDF is image-based (scanned). The app cannot extract text from images. Export the
+exam from Word as a PDF, or use the DOCX upload instead.
+
+**DOCX uploaded but questions not detected**  
+If the DOCX does not use Word automatic numbered lists, the labels may not be present in
+the extracted text. Open the file in Word, select all text, and confirm the numbering
+style is "Automatic" (not manually typed). As a workaround, copy–paste the text directly.
+
+**Hebrew text looks reversed or garbled in the export**  
+The Word export sets paragraph direction to RTL. If your version of Word or another app
+shows text reversed, check that the paragraph direction is set to Right-to-Left
+(Format → Paragraph → Direction in Word).
+
+**App works locally but not on GitHub Pages**  
+Confirm `NEXT_PUBLIC_BASE_PATH=/mcq-shuffler` is set in the GitHub Actions workflow
+(`deploy.yml`). The local build does not set this variable, but the Pages build must.
+Check: Settings → Pages → Build and deployment → Source → GitHub Actions.
+
+## Release Checklist
+
+Before pushing a new version to `main`:
+
+- [ ] `npm test` — all tests pass
+- [ ] `npm run typecheck` — zero TypeScript errors
+- [ ] `npm run build` — static export succeeds
+- [ ] Push to `main` → GitHub Actions workflow passes (typecheck + test + build + deploy)
+- [ ] Open https://tomkruchenezki.github.io/mcq-shuffler/ and confirm the page loads
+- [ ] Run the Manual QA Checklist above with a real Hebrew exam DOCX
+- [ ] Confirm Word, CSV, and PDF exports open correctly
+
+## Manual test fixtures
+
+Real exam files for manual testing go in `manual-fixtures/` (gitignored — local only).
+Do NOT commit real exam files to this repository.
 
 ## Project guidance
 
