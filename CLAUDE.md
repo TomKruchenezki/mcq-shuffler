@@ -79,7 +79,7 @@ npm run build        # static export to out/
 | 2 | Hebrew RTL infrastructure (CSS, fixtures, QuestionCard, FixturePreview) | Done |
 | 2.5 | CLAUDE.md + RTL skill | Done |
 | 2.6 | GitHub Pages deployment workflow | Done |
-| 3 | Plain-text parser (detect questions + options from raw text) | Next |
+| 3 | Plain-text parser (detect questions + options from raw text) | Done |
 | 4 | Shuffle logic and answer key | — |
 | 5 | UI flow (upload → parse → shuffle → preview) | — |
 | 6 | DOCX and CSV export | — |
