@@ -82,3 +82,6 @@ commands, workflow rules, and phase order. Read this before starting any session
 `/hebrew-rtl-qa` whenever changing UI rendering, text preview, parser text handling,
 or DOCX export. Verifies RTL layout, mixed-direction text, and that no source text is
 modified or reversed.
+
+**`.claude/agents/`** — Three project-specific subagents: `mcq-core-engineer` (core logic invariants),
+`hebrew-rtl-reviewer` (RTL and text fidelity), `qa-verifier` (test coverage and build health).

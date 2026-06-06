@@ -71,6 +71,16 @@ npm run build        # static export to out/
 
 ---
 
+## Project Subagents
+
+| Agent | When to use |
+|---|---|
+| `mcq-core-engineer` | Parser contracts, shuffle logic, answer key, invariant review, Step 4+ |
+| `hebrew-rtl-reviewer` | Any change touching Hebrew text, RTL rendering, parser text, UI, or export |
+| `qa-verifier` | Before completing each step — tests, typecheck, coverage audit |
+
+---
+
 ## Phase Order
 
 | Step | Description | Status |
