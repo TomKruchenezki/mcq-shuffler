@@ -5,8 +5,8 @@ import type { QuestionRegion, OptionRegion } from './visualTypes'
 const Y_TOLERANCE = 3.0   // same as pdfLines.ts
 const REGION_PAD = 4.0    // PDF units of padding around each detected region
 
-// Detects question markers: "שאלה 1", "שאלה", "1.", ".1", "1)"
-const QUESTION_RE = /^(שאלה\s*\d*|(\d+)\s*[\.\)]\s|[\.\)]\s*(\d+)[\s$])/
+// Detects question markers including reversed RTL form ":2 שאלה מספר" / "2: שאלה מספר"
+const QUESTION_RE = /^(:?\s*\d+(?::\s+|\s+)שאלה|שאלה\s*\d*|(\d+)\s*[\.\)]\s|[\.\)]\s*(\d+)(?:\s|$))/
 
 // Detects option markers: "א." "א)" at start, or ".א" ")א" at end (RTL-flipped)
 const OPTION_RE = /^([א-ת])[.)]/
@@ -47,10 +47,16 @@ function lineTextOf(items: PdfTextItem[]): string {
 }
 
 function extractQuestionNumber(text: string): number {
-  const hebrewMatch = text.match(/שאלה\s*(\d+)/)
+  // Reversed RTL form: ":2 שאלה מספר" or "2: שאלה מספר" — number comes before שאלה
+  const reversedMatch = text.match(/^:?\s*(\d+)(?::\s+|\s+)שאלה/)
+  if (reversedMatch) return parseInt(reversedMatch[1], 10)
+  // Forward Hebrew form: "שאלה 2" or "שאלה מספר 2"
+  const hebrewMatch = text.match(/שאלה(?:\s+מספר)?\s*(\d+)/)
   if (hebrewMatch) return parseInt(hebrewMatch[1], 10)
+  // Numeric: "2." or "2)"
   const numericMatch = text.match(/^(\d+)\s*[\.\)]/)
   if (numericMatch) return parseInt(numericMatch[1], 10)
+  // RTL-flipped: ".2"
   const flippedMatch = text.match(/[\.\)]\s*(\d+)/)
   if (flippedMatch) return parseInt(flippedMatch[1], 10)
   return 0

@@ -413,3 +413,50 @@ describe('diagnoseParsedExam', () => {
     expect(diagnoseParsedExam({ questions }).parsedQuestionCount).toBe(2)
   })
 })
+
+describe('sequenceIndex on ParsedQuestion', () => {
+  it('first question gets sequenceIndex 0', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא')
+    expect(questions[0].sequenceIndex).toBe(0)
+  })
+
+  it('second question gets sequenceIndex 1', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא\n2. שאלה\nא. כן\nב. לא')
+    expect(questions[1].sequenceIndex).toBe(1)
+  })
+
+  it('duplicate question numbers still get distinct sequenceIndex', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא\n1. שאלה שנייה\nא. כן\nב. לא')
+    expect(questions).toHaveLength(2)
+    expect(questions[0].sequenceIndex).toBe(0)
+    expect(questions[1].sequenceIndex).toBe(1)
+  })
+
+  it('3 questions with identical numbers have sequenceIndex 0, 1, 2', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\n1. שאלה\nא. כן\n1. שאלה\nא. כן')
+    expect(questions).toHaveLength(3)
+    expect(questions.map(q => q.sequenceIndex)).toEqual([0, 1, 2])
+  })
+
+  it('sequenceIndex is independent of question number value', () => {
+    // Out-of-order numbers 5, 1, 3 — sequenceIndex must still be 0, 1, 2
+    const { questions } = parseExam('5. שאלה\nא. כן\n1. שאלה\nא. כן\n3. שאלה\nא. כן')
+    expect(questions.map(q => q.sequenceIndex)).toEqual([0, 1, 2])
+  })
+})
+
+describe('nonSequentialNumbers in diagnoseParsedExam', () => {
+  it('sequential numbers produce empty nonSequentialNumbers', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא\n2. שאלה\nא. כן\nב. לא')
+    expect(diagnoseParsedExam({ questions }).nonSequentialNumbers).toEqual([])
+  })
+
+  it('detects a number lower than the previous question number', () => {
+    const { questions } = parseExam('3. שאלה\nא. כן\nב. לא\n1. שאלה\nא. כן\nב. לא')
+    expect(diagnoseParsedExam({ questions }).nonSequentialNumbers).toContain(1)
+  })
+
+  it('empty exam has nonSequentialNumbers []', () => {
+    expect(diagnoseParsedExam({ questions: [] }).nonSequentialNumbers).toEqual([])
+  })
+})

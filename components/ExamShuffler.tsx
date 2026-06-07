@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { parseExam } from '@/lib/parser/parseQuestions'
 import { shuffleExam, generateAnswerKey } from '@/lib/shuffle/shuffleExam'
 import { shuffleVisualExam, generateVisualAnswerKey } from '@/lib/shuffle/shuffleVisualExam'
-import type { ParsedExam } from '@/lib/parser/parseQuestions'
+import type { ParsedExam, ParsedQuestion } from '@/lib/parser/parseQuestions'
 import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
 import type { VisualQuestion, ShuffledVisualExam } from '@/lib/extract/pdfEngine/visualTypes'
 import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes'
@@ -47,10 +47,20 @@ export default function ExamShuffler() {
   const [parsedExam, setParsedExam] = useState<ParsedExam | null>(null)
   const [shuffledExam, setShuffledExam] = useState<ShuffledExam | null>(null)
   const [answerKey, setAnswerKey] = useState<AnswerKeyRow[] | null>(null)
+  const [questionOrder, setQuestionOrder] = useState<'file' | 'numeric'>('file')
 
   // Parallel visual pipeline state
   const [visualQuestions, setVisualQuestions] = useState<VisualQuestion[] | null>(null)
   const [shuffledVisualExam, setShuffledVisualExam] = useState<ShuffledVisualExam | null>(null)
+
+  /** Returns questions in the selected display/shuffle order. Stable: same number → preserve file order. */
+  function sortedForOrder(exam: ParsedExam): ParsedQuestion[] {
+    if (questionOrder === 'file') return exam.questions
+    return [...exam.questions].sort((a, b) => {
+      if (a.number !== b.number) return a.number - b.number
+      return a.sequenceIndex - b.sequenceIndex
+    })
+  }
 
   const canShuffle =
     (parsedExam !== null && parsedExam.questions.length > 0) ||
@@ -72,7 +82,8 @@ export default function ExamShuffler() {
       return
     }
     if (!parsedExam) return
-    const shuffled = shuffleExam(parsedExam)
+    const orderedExam: ParsedExam = { questions: sortedForOrder(parsedExam) }
+    const shuffled = shuffleExam(orderedExam)
     setShuffledExam(shuffled)
     setAnswerKey(generateAnswerKey(shuffled))
   }
@@ -88,6 +99,7 @@ export default function ExamShuffler() {
     setParsedExam(null)
     setShuffledExam(null)
     setAnswerKey(null)
+    setQuestionOrder('file')
     setVisualQuestions(null)
     setShuffledVisualExam(null)
   }
@@ -164,8 +176,32 @@ export default function ExamShuffler() {
         )}
       </div>
 
+      {/* Question ordering toggle — shown once questions are parsed */}
+      {parsedExam !== null && parsedExam.questions.length > 0 && (
+        <div className="flex items-center gap-3 mb-2 mt-1 text-sm" dir="rtl">
+          <span className="text-gray-600">סידור שאלות:</span>
+          {(['file', 'numeric'] as const).map(order => (
+            <label key={order} className="flex items-center gap-1 cursor-pointer text-gray-700">
+              <input
+                type="radio"
+                name="questionOrder"
+                value={order}
+                checked={questionOrder === order}
+                onChange={() => setQuestionOrder(order)}
+                className="accent-gray-600"
+              />
+              {order === 'file' ? 'לפי סדר הקובץ' : 'לפי מספר שאלה'}
+            </label>
+          ))}
+        </div>
+      )}
+
       {/* Parsed preview (text mode only) */}
-      {parsedExam !== null && <ParsedExamPreview exam={parsedExam} />}
+      {parsedExam !== null && (
+        <ParsedExamPreview
+          exam={{ questions: sortedForOrder(parsedExam) }}
+        />
+      )}
 
       {/* Shuffled exam — text mode */}
       {shuffledExam !== null && <ShuffledExamView exam={shuffledExam} />}

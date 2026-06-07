@@ -137,7 +137,14 @@ describe('FileUpload', () => {
   })
 
   it('visual mode calls extractPdfVisual, not extractPdfHybrid', async () => {
-    mockExtractPdfVisual.mockResolvedValue({ visualQuestions: [] })
+    // Return a non-empty result so the fallback is not triggered
+    mockExtractPdfVisual.mockResolvedValue({
+      visualQuestions: [{ number: 1, stemDataUrl: 'data:,stem', options: [
+        { originalIndex: 0, isOriginalCorrectAnswer: true, dataUrl: 'data:,opt',
+          labelBox: { pdfRect: { x: 0, y: 0, width: 10, height: 10 }, labelChar: 'א' },
+          approximateText: 'תשובה' },
+      ], pageIndex: 0 }],
+    })
     render(<FileUpload onExtracted={() => {}} />)
 
     fireEvent.click(screen.getByDisplayValue('visual'))
@@ -151,6 +158,26 @@ describe('FileUpload', () => {
       expect(mockExtractPdfVisual).toHaveBeenCalled()
     })
     expect(mockExtractPdfHybrid).not.toHaveBeenCalled()
+  })
+
+  it('visual mode falls back to text extraction when no questions are detected', async () => {
+    mockExtractPdfVisual.mockResolvedValue({ visualQuestions: [], warning: 'לא זוהו שאלות' })
+    mockExtractPdfHybrid.mockResolvedValue({ text: 'שאלה 1\nא. כן\nב. לא', quality: null })
+    const onExtracted = vi.fn()
+    render(<FileUpload onExtracted={onExtracted} />)
+
+    fireEvent.click(screen.getByDisplayValue('visual'))
+
+    const input = document.querySelector('input[type="file"]')!
+    await act(async () => {
+      uploadFile(input, new File(['dummy pdf'], 'exam.pdf'))
+    })
+
+    await waitFor(() => {
+      expect(mockExtractPdfVisual).toHaveBeenCalled()
+      expect(mockExtractPdfHybrid).toHaveBeenCalledWith(expect.any(ArrayBuffer), 'auto', undefined)
+      expect(onExtracted).toHaveBeenCalled()
+    })
   })
 
   it('visual mode calls onVisualExtracted with VisualExtractionResult', async () => {

@@ -15,6 +15,7 @@ export interface ParsedQuestion {
   number: number
   questionText: string
   options: ParsedOption[]
+  sequenceIndex: number  // 0-based position in extracted text; stable across sort/reorder
 }
 
 export interface ParsedExam {
@@ -48,6 +49,7 @@ interface AccQuestion {
   number: number
   questionTextParts: string[]
   options: AccOption[]
+  sequenceIndex: number  // captured when question opens = questions.length at that moment
 }
 
 function flushOption(acc: AccOption): ParsedOption {
@@ -64,6 +66,7 @@ function flushQuestion(acc: AccQuestion): ParsedQuestion {
     number: acc.number,
     questionText: acc.questionTextParts.join(' ').trim(),
     options: acc.options.map(flushOption),
+    sequenceIndex: acc.sequenceIndex,
   }
 }
 
@@ -139,6 +142,7 @@ export function parseExam(rawText: string): ParsedExam {
         number: questionNumber,
         questionTextParts: questionInlineText ? [questionInlineText] : [],
         options: [],
+        sequenceIndex: questions.length,  // = how many questions flushed so far
       }
       continue
     }
@@ -184,6 +188,7 @@ export interface ParseDiagnostics {
   suspiciousHugeBlocks: number[]
   questionNumbers: number[]
   duplicateQuestionNumbers: number[]
+  nonSequentialNumbers: number[]  // question numbers where q.number < previous q.number (likely mis-read digit)
 }
 
 export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
@@ -194,6 +199,13 @@ export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
     if (seen.has(n)) duplicates.push(n)
     seen.add(n)
   }
+  const nonSequential: number[] = []
+  for (let i = 1; i < exam.questions.length; i++) {
+    const prev = exam.questions[i - 1]!
+    const curr = exam.questions[i]!
+    if (curr.number < prev.number) nonSequential.push(curr.number)
+  }
+
   return {
     parsedQuestionCount: exam.questions.length,
     questionsWithFewerThanTwoOptions: exam.questions
@@ -204,5 +216,6 @@ export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
       .map(q => q.number),
     questionNumbers: numbers,
     duplicateQuestionNumbers: [...new Set(duplicates)],
+    nonSequentialNumbers: nonSequential,
   }
 }

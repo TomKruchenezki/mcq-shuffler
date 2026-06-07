@@ -147,4 +147,34 @@ describe('detectQuestionRegions', () => {
     expect(regions).toHaveLength(1)
     expect(regions[0].options).toHaveLength(1)
   })
+
+  it('detects reversed RTL question marker :2 שאלה מספר', () => {
+    const items = [
+      item(':2 שאלה מספר', 50, 700),
+      item('א. תשובה', 50, 680),
+      item('ב. תשובה', 50, 660),
+    ]
+    const regions = detectQuestionRegions(items, PAGE_H)
+    expect(regions).toHaveLength(1)
+    expect(regions[0].options).toHaveLength(2)
+  })
+
+  it('extracts correct question number from reversed marker :2 שאלה מספר', () => {
+    const items = [
+      item(':2 שאלה מספר', 50, 700),
+      item('א. תשובה', 50, 680),
+    ]
+    const regions = detectQuestionRegions(items, PAGE_H)
+    expect(regions[0].questionNumber).toBe(2)
+  })
+
+  it('detects reversed RTL marker 3: שאלה מספר (N: colon-after-number form)', () => {
+    const items = [
+      item('3: שאלה מספר', 50, 700),
+      item('א. תשובה', 50, 680),
+    ]
+    const regions = detectQuestionRegions(items, PAGE_H)
+    expect(regions).toHaveLength(1)
+    expect(regions[0].questionNumber).toBe(3)
+  })
 })

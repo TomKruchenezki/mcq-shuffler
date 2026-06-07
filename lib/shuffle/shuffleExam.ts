@@ -17,6 +17,7 @@ export interface ShuffledQuestion {
   number: number
   questionText: string
   options: ShuffledOption[]
+  sequenceIndex?: number  // carried from ParsedQuestion; used for stable ordering references
 }
 
 export interface ShuffledExam {
@@ -54,6 +55,7 @@ function shuffleQuestion(q: ParsedQuestion, rng: () => number): ShuffledQuestion
         originalIndex: opt.originalIndex,
         isCorrectAnswer: opt.isOriginalCorrectAnswer,
       })),
+      sequenceIndex: q.sequenceIndex,
     }
   }
 
@@ -78,6 +80,7 @@ function shuffleQuestion(q: ParsedQuestion, rng: () => number): ShuffledQuestion
       originalIndex: opts[origIdx].originalIndex,
       isCorrectAnswer: opts[origIdx].isOriginalCorrectAnswer,
     })),
+    sequenceIndex: q.sequenceIndex,
   }
 }
 

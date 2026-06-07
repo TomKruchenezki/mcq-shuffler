@@ -31,8 +31,18 @@ export default function ParsedExamPreview({ exam }: Props) {
           ⚠ {diag.questionsWithFewerThanTwoOptions.length} שאלות עם פחות מ-2 תשובות
         </p>
       )}
+      {diag.suspiciousHugeBlocks.length > 0 && (
+        <p className="text-amber-600 text-sm" role="alert">
+          ⚠ בלוק טקסט חשוד גדול — ייתכן שמספר שאלות הוכנסו לאחת: שאלות {diag.suspiciousHugeBlocks.join(', ')}
+        </p>
+      )}
+      {diag.nonSequentialNumbers.length > 0 && (
+        <p className="text-amber-600 text-sm" role="alert">
+          ⚠ מספרי שאלות לא עולים בסדר — ייתכן שגיאת קריאה: שאלות {diag.nonSequentialNumbers.join(', ')}
+        </p>
+      )}
       {exam.questions.map(q => (
-        <article key={q.number} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+        <article key={q.sequenceIndex} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <p dir="rtl" className="font-semibold text-gray-800 leading-relaxed">
             <strong className="text-blue-600 ml-2">שאלה {q.number}:</strong>
             {q.questionText}

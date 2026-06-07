@@ -124,15 +124,21 @@ export async function extractPdfVisual(
       }
     }
 
-    if (allQuestions.length === 0) {
+    // Filter out regions with no options — these are incomplete/misdetected regions
+    // (e.g. question spans page boundary; only stem on this page, options on next)
+    const completeQuestions = allQuestions.filter(q => q.options.length > 0)
+
+    if (completeQuestions.length === 0) {
       return {
         visualQuestions: [],
         warning:
-          'לא זוהו שאלות בחילוץ הוויזואלי. ייתכן שה-PDF סרוק ואין שכבת טקסט — נסה מצב OCR מקומי.',
+          allQuestions.length > 0
+            ? 'זוהו אזורים חלקיים בלבד במצב נאמנות גבוהה (ללא תשובות). ייתכן שהשאלות משתרעות על פני עמודים — נסה מצב אוטומטי.'
+            : 'לא זוהו שאלות בחילוץ הוויזואלי. ייתכן שה-PDF סרוק ואין שכבת טקסט — נסה מצב OCR מקומי.',
       }
     }
 
-    return { visualQuestions: allQuestions }
+    return { visualQuestions: completeQuestions }
   } catch {
     return {
       visualQuestions: [],

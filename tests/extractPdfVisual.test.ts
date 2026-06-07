@@ -158,4 +158,42 @@ describe('extractPdfVisual', () => {
     expect(result.visualQuestions).toHaveLength(0)
     expect(result.warning).toBeDefined()
   })
+
+  it('filters out regions with 0 options', async () => {
+    const noOptionRegion: QuestionRegion = {
+      questionNumber: 1,
+      stemYTop: 704,
+      stemYBottom: 0,
+      options: [],
+    }
+    mockDetectQuestionRegions.mockReturnValue([noOptionRegion])
+    const result = await extractPdfVisual(new ArrayBuffer(8))
+    expect(result.visualQuestions).toHaveLength(0)
+  })
+
+  it('returns partial-detection warning when regions existed but all had 0 options', async () => {
+    const noOptionRegion: QuestionRegion = {
+      questionNumber: 1,
+      stemYTop: 704,
+      stemYBottom: 0,
+      options: [],
+    }
+    mockDetectQuestionRegions.mockReturnValue([noOptionRegion])
+    const result = await extractPdfVisual(new ArrayBuffer(8))
+    expect(result.warning).toMatch(/חלקיים/)
+  })
+
+  it('keeps regions with 1+ options and filters those with 0', async () => {
+    const goodRegion = makeRegion(1)  // has 1 option
+    const badRegion: QuestionRegion = {
+      questionNumber: 2,
+      stemYTop: 500,
+      stemYBottom: 0,
+      options: [],
+    }
+    mockDetectQuestionRegions.mockReturnValue([goodRegion, badRegion])
+    const result = await extractPdfVisual(new ArrayBuffer(8))
+    expect(result.visualQuestions).toHaveLength(1)
+    expect(result.visualQuestions[0].number).toBe(1)
+  })
 })

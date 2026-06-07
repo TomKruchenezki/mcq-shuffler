@@ -22,11 +22,12 @@ function makeOption(text: string, originalIndex: number): ParsedOption {
   }
 }
 
-function makeQuestion(num: number, text: string, opts: string[]): ParsedQuestion {
+function makeQuestion(num: number, text: string, opts: string[], seqIdx = 0): ParsedQuestion {
   return {
     number: num,
     questionText: text,
     options: opts.map((t, i) => makeOption(t, i)),
+    sequenceIndex: seqIdx,
   }
 }
 
@@ -101,6 +102,7 @@ describe('shuffleExam — structure preservation', () => {
       number: 1,
       questionText: 'שורה ראשונה\nשורה שניה\nשורה שלישית',
       options: [makeOption('A', 0), makeOption('B', 1)],
+      sequenceIndex: 0,
     }
     const shuffled = shuffleExam(makeExam(multiLineQ))
     expect(shuffled.questions[0].questionText).toBe('שורה ראשונה\nשורה שניה\nשורה שלישית')
@@ -371,7 +373,7 @@ describe('shuffleExam — edge cases', () => {
   })
 
   it('question with zero options — no crash', () => {
-    const q: ParsedQuestion = { number: 1, questionText: 'Q', options: [] }
+    const q: ParsedQuestion = { number: 1, questionText: 'Q', options: [], sequenceIndex: 0 }
     const result = shuffleExam(makeExam(q))
     expect(result.questions[0].options).toHaveLength(0)
   })

@@ -83,6 +83,25 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
           return
         }
 
+        if (visualResult.visualQuestions.length === 0) {
+          // Visual detection returned no usable questions — fall back to text extraction automatically
+          setWarning(
+            (visualResult.warning ? visualResult.warning + '\n' : '') +
+            'עובר לחילוץ טקסטואלי אוטומטי במקום.',
+          )
+          const textResult = await extractPdfHybrid(buffer, 'auto', undefined)
+          setStatus('done')
+          if (!textResult.error && textResult.text) {
+            if (textResult.quality) setQuality(textResult.quality)
+            setComplexity(textResult.complexity ?? null)
+            setPreviewText(textResult.text.slice(0, 300))
+            setUsedMode('נאמנות גבוהה (עם חזרה לטקסט)')
+            onExtracted(textResult.text)
+          }
+          // Note: does NOT call onVisualExtracted — stays in text mode
+          return
+        }
+
         if (visualResult.warning) setWarning(visualResult.warning)
         setUsedMode('נאמנות גבוהה')
         setStatus('done')
