@@ -33,7 +33,7 @@ export interface EditableQuestion {
   reviewStatus: EditableReviewStatus
   notes?: string
   hasVisualContent: boolean
-  visualImageDataUrl?: string    // TODO: image attachment (Step 8.5)
+  visualImageDataUrl?: string
 }
 
 export interface EditableExam {
@@ -107,9 +107,11 @@ export function editableToParsed(exam: EditableExam): ParsedExam {
         text: opt.text,
         originalIndex: opt.originalIndex ?? idx,
         isOriginalCorrectAnswer: opt.id === q.correctOptionId,
+        visualImageDataUrl: opt.visualImageDataUrl,
       })),
       status: 'ok' as const,
       hasVisualContent: q.hasVisualContent,
+      visualImageDataUrl: q.visualImageDataUrl,
     })),
   }
 }
@@ -264,6 +266,29 @@ export function moveOption(
       const options = [...q.options]
       ;[options[idx], options[targetIdx]] = [options[targetIdx], options[idx]]
       return { ...q, options }
+    }),
+  }
+}
+
+/**
+ * Set or clear the image attached to a specific option.
+ * Pass `undefined` to remove the image.
+ */
+export function updateOptionImage(
+  exam: EditableExam,
+  questionId: string,
+  optionId: string,
+  dataUrl: string | undefined,
+): EditableExam {
+  return {
+    questions: exam.questions.map(q => {
+      if (q.id !== questionId) return q
+      return {
+        ...q,
+        options: q.options.map(o =>
+          o.id === optionId ? { ...o, visualImageDataUrl: dataUrl } : o,
+        ),
+      }
     }),
   }
 }

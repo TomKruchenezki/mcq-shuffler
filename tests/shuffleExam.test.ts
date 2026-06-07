@@ -258,6 +258,45 @@ describe('shuffleExam — variable option counts', () => {
   })
 })
 
+// ─── shuffleExam — visualImageDataUrl pipeline ───────────────────────────────
+
+describe('shuffleExam — visualImageDataUrl pipeline', () => {
+  it('visualImageDataUrl on ParsedQuestion is carried through to ShuffledQuestion', () => {
+    const q: ParsedQuestion = {
+      ...makeQuestion(1, 'Q', ['A', 'B', 'C']),
+      visualImageDataUrl: 'data:image/png;base64,qimg',
+    }
+    const shuffled = shuffleExam(makeExam(q), alwaysSwapRng)
+    expect(shuffled.questions[0].visualImageDataUrl).toBe('data:image/png;base64,qimg')
+  })
+
+  it('visualImageDataUrl on ParsedOption is carried through to ShuffledOption', () => {
+    const q = makeQuestion(1, 'Q', ['A', 'B', 'C'])
+    q.options[1]!.visualImageDataUrl = 'data:image/png;base64,optimg'
+    const shuffled = shuffleExam(makeExam(q), alwaysSwapRng)
+    const optWithImg = shuffled.questions[0].options.find(o => o.visualImageDataUrl)
+    expect(optWithImg?.visualImageDataUrl).toBe('data:image/png;base64,optimg')
+  })
+
+  it('generateAnswerKey uses placeholder [תשובה עם תמונה] for image-only correct answer', () => {
+    const q: ParsedQuestion = {
+      number: 1, sequenceIndex: 0, outputQuestionNumber: 1,
+      questionText: 'Q',
+      options: [
+        {
+          originalLabel: 'א', text: '', originalIndex: 0,
+          isOriginalCorrectAnswer: true, visualImageDataUrl: 'data:image/png;base64,correct',
+        },
+        { originalLabel: 'ב', text: 'wrong', originalIndex: 1, isOriginalCorrectAnswer: false },
+      ],
+      status: 'ok', hasVisualContent: false,
+    }
+    const shuffled = shuffleExam(makeExam(q), alwaysIdentityRng)
+    const [row] = generateAnswerKey(shuffled)
+    expect(row.correctAnswerText).toBe('[תשובה עם תמונה]')
+  })
+})
+
 // ─── shuffleExam — correct answer tracking ───────────────────────────────────
 
 describe('shuffleExam — correct answer tracking', () => {

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockExtractPdfText, mockExtractPdfTextFromProxy, mockExtractPdfOcr, mockGetDocument } =
+const { mockExtractPdfText, mockExtractPdfTextFromProxy, mockExtractPdfOcr, mockGetDocument, mockParseExam } =
   vi.hoisted(() => ({
     mockExtractPdfText: vi.fn(),
     mockExtractPdfTextFromProxy: vi.fn(),
     mockExtractPdfOcr: vi.fn(),
     mockGetDocument: vi.fn(),
+    mockParseExam: vi.fn(),
   }))
 
 vi.mock('pdfjs-dist', () => ({
@@ -21,6 +22,10 @@ vi.mock('@/lib/extract/extractPdf', () => ({
 
 vi.mock('@/lib/extract/pdfEngine/extractPdfOcr', () => ({
   extractPdfOcr: mockExtractPdfOcr,
+}))
+
+vi.mock('@/lib/parser/parseQuestions', () => ({
+  parseExam: mockParseExam,
 }))
 
 import { extractPdfHybrid, isNativeQualityPoor } from '@/lib/extract/pdfEngine/extractPdfHybrid'
@@ -45,6 +50,8 @@ describe('extractPdfHybrid', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetDocument.mockReturnValue({ promise: Promise.resolve(mockPdf) })
+    // Default: parseExam returns 0 questions (tie → OCR wins, preserving existing behaviour)
+    mockParseExam.mockReturnValue({ questions: [] })
   })
 
   it('mode=fast delegates to extractPdfText and returns its result', async () => {
@@ -85,11 +92,63 @@ describe('extractPdfHybrid', () => {
     const ocrResult = { text: 'OCR fallback', quality: makeQuality({ detectedQuestionMarkers: 3 }) }
     mockExtractPdfTextFromProxy.mockResolvedValue(nativeResult)
     mockExtractPdfOcr.mockResolvedValue(ocrResult)
+    // Both parse 0 questions (default mock) — tie → OCR wins
 
     const result = await extractPdfHybrid(new ArrayBuffer(8), 'auto')
 
     expect(mockExtractPdfOcr).toHaveBeenCalledWith(mockPdf, undefined)
     expect(result).toBe(ocrResult)
+  })
+
+  it('auto mode: native wins when it parses more questions than OCR', async () => {
+    // Native triggers poor-quality (detectedQuestionMarkers=0, chars>200) but parses more questions
+    const nativeResult = { text: 'native rich text', quality: makeQuality({ detectedQuestionMarkers: 0, chars: 500 }) }
+    const ocrResult    = { text: 'ocr poor text',   quality: makeQuality({ detectedQuestionMarkers: 2 }) }
+    mockExtractPdfTextFromProxy.mockResolvedValue(nativeResult)
+    mockExtractPdfOcr.mockResolvedValue(ocrResult)
+
+    // Native parses 2 questions, OCR parses 1 → native wins
+    mockParseExam
+      .mockReturnValueOnce({ questions: [{ number: 1 }, { number: 2 }] })  // native
+      .mockReturnValueOnce({ questions: [{ number: 1 }] })                  // OCR
+
+    const result = await extractPdfHybrid(new ArrayBuffer(8), 'auto')
+
+    expect(result).toBe(nativeResult)
+    expect(result.nativePreferredOverOcr).toBe(true)
+  })
+
+  it('auto mode: autoModeReason set to Hebrew explanation when native preferred over OCR', async () => {
+    const nativeResult = { text: 'native', quality: makeQuality({ detectedQuestionMarkers: 0, chars: 300 }) }
+    const ocrResult    = { text: 'ocr',    quality: makeQuality() }
+    mockExtractPdfTextFromProxy.mockResolvedValue(nativeResult)
+    mockExtractPdfOcr.mockResolvedValue(ocrResult)
+
+    mockParseExam
+      .mockReturnValueOnce({ questions: [{ number: 1 }, { number: 2 }, { number: 3 }] })  // native: 3
+      .mockReturnValueOnce({ questions: [{ number: 1 }] })                                  // OCR: 1
+
+    const result = await extractPdfHybrid(new ArrayBuffer(8), 'auto')
+
+    expect(result.autoModeReason).toMatch(/טקסטואלי/)
+    expect(result.nativePreferredOverOcr).toBe(true)
+  })
+
+  it('auto mode: OCR wins and autoModeReason mentions OCR when OCR parses more questions', async () => {
+    const nativeResult = { text: 'poor native', quality: makeQuality({ chars: 50 }) }
+    const ocrResult    = { text: 'good ocr',   quality: makeQuality() }
+    mockExtractPdfTextFromProxy.mockResolvedValue(nativeResult)
+    mockExtractPdfOcr.mockResolvedValue(ocrResult)
+
+    mockParseExam
+      .mockReturnValueOnce({ questions: [] })                                                // native: 0
+      .mockReturnValueOnce({ questions: [{ number: 1 }, { number: 2 }, { number: 3 }] })   // OCR: 3
+
+    const result = await extractPdfHybrid(new ArrayBuffer(8), 'auto')
+
+    expect(result).toBe(ocrResult)
+    expect(result.autoModeReason).toMatch(/OCR/)
+    expect(result.nativePreferredOverOcr).toBeUndefined()
   })
 })
 

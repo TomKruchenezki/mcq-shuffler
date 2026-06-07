@@ -13,7 +13,10 @@ export async function exportDocxBuffer(
   for (const q of exam.questions) {
     paragraphs.push(rtlParagraph(`${q.outputQuestionNumber}. ${q.questionText}`, { bold: true }))
     for (const opt of q.options) {
-      paragraphs.push(rtlParagraph(`${opt.label}. ${opt.text}`))
+      // Image-only options: data URLs can't be embedded in DOCX by this library.
+      // Use a text placeholder so the option is not silently dropped.
+      const optText = opt.text || (opt.visualImageDataUrl ? '[תמונה — לא זמינה בייצוא Word]' : '')
+      paragraphs.push(rtlParagraph(`${opt.label}. ${optText}`))
     }
     paragraphs.push(rtlParagraph(''))
   }

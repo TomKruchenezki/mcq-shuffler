@@ -11,6 +11,8 @@ export interface ShuffledOption {
   text: string
   originalIndex: number
   isCorrectAnswer: boolean
+  /** Manually attached image data URL (carried from EditableOption via editableToParsed). */
+  visualImageDataUrl?: string
 }
 
 export interface ShuffledQuestion {
@@ -19,6 +21,8 @@ export interface ShuffledQuestion {
   options: ShuffledOption[]
   sequenceIndex?: number       // carried from ParsedQuestion; used for stable ordering references
   outputQuestionNumber: number // always sequential 1,2,3... = sequenceIndex + 1
+  /** Manually attached image data URL for the question body. */
+  visualImageDataUrl?: string
 }
 
 export interface ShuffledExam {
@@ -55,9 +59,11 @@ function shuffleQuestion(q: ParsedQuestion, rng: () => number): ShuffledQuestion
         text: opt.text,
         originalIndex: opt.originalIndex,
         isCorrectAnswer: opt.isOriginalCorrectAnswer,
+        visualImageDataUrl: opt.visualImageDataUrl,
       })),
       sequenceIndex: q.sequenceIndex,
       outputQuestionNumber: q.outputQuestionNumber,
+      visualImageDataUrl: q.visualImageDataUrl,
     }
   }
 
@@ -81,9 +87,11 @@ function shuffleQuestion(q: ParsedQuestion, rng: () => number): ShuffledQuestion
       text: opts[origIdx].text,
       originalIndex: opts[origIdx].originalIndex,
       isCorrectAnswer: opts[origIdx].isOriginalCorrectAnswer,
+      visualImageDataUrl: opts[origIdx].visualImageDataUrl,
     })),
     sequenceIndex: q.sequenceIndex,
     outputQuestionNumber: q.outputQuestionNumber,
+    visualImageDataUrl: q.visualImageDataUrl,
   }
 }
 
@@ -100,7 +108,7 @@ export function generateAnswerKey(exam: ShuffledExam): AnswerKeyRow[] {
     if (correct === undefined) continue
     rows.push({
       questionNumber: q.outputQuestionNumber,  // always sequential 1,2,3...
-      correctAnswerText: correct.text,
+      correctAnswerText: correct.text || (correct.visualImageDataUrl ? '[תשובה עם תמונה]' : ''),
       newCorrectLabel: correct.label,
       newCorrectIndex: q.options.indexOf(correct),
       originalCorrectIndex: 0,

@@ -9,6 +9,8 @@ export interface ParsedOption {
   text: string
   originalIndex: number
   isOriginalCorrectAnswer: boolean
+  /** Manually attached image data URL (set by editableToParsed; never set by parseExam). */
+  visualImageDataUrl?: string
 }
 
 export type QuestionStatus =
@@ -26,6 +28,8 @@ export interface ParsedQuestion {
   options: ParsedOption[]
   status: QuestionStatus
   hasVisualContent: boolean    // detected from text keywords or blank options
+  /** Manually attached image data URL (set by editableToParsed; never set by parseExam). */
+  visualImageDataUrl?: string
 }
 
 export interface ParsedExam {

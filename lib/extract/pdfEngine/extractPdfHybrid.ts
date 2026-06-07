@@ -4,6 +4,7 @@ import { extractPdfOcr } from './extractPdfOcr'
 import type { PdfMode, OnProgress } from './types'
 import type { ComplexityFlags } from './visualTypes'
 import type { PdfTextItem } from '../pdfLines'
+import { parseExam } from '@/lib/parser/parseQuestions'
 
 export type { PdfMode, OnProgress }
 
@@ -108,9 +109,29 @@ export async function extractPdfHybrid(
     if (complexity) nativeResult.complexity = complexity
 
     if (nativeResult.quality && !isNativeQualityPoor(nativeResult.quality)) {
+      // Native quality is good — skip OCR entirely
       return nativeResult
     }
-    return extractPdfOcr(pdf, onProgress)
+
+    // Native quality is poor: run OCR, then compare by actual parsed question count.
+    // If native still parses more questions (e.g. the quality heuristic misfired on a
+    // well-structured PDF whose question format doesn't match the marker regex), prefer native.
+    const ocrResult = await extractPdfOcr(pdf, onProgress)
+    if (complexity) ocrResult.complexity = complexity
+
+    const nativeParsedCount = parseExam(nativeResult.text).questions.length
+    const ocrParsedCount    = parseExam(ocrResult.text).questions.length
+
+    if (nativeParsedCount > ocrParsedCount) {
+      nativeResult.autoModeReason =
+        'החילוץ הטקסטואלי נתן תוצאה טובה יותר מ-OCR, ולכן נבחר אוטומטית.'
+      nativeResult.nativePreferredOverOcr = true
+      return nativeResult
+    }
+
+    // OCR wins (including tie — preserves backward-compatible behaviour for scanned PDFs)
+    ocrResult.autoModeReason = 'OCR נבחר כי החילוץ הטקסטואלי היה חלש.'
+    return ocrResult
   } catch {
     return { text: '', error: 'לא ניתן לחלץ טקסט מקובץ PDF. ייתכן שהקובץ פגום.' }
   }

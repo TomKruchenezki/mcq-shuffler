@@ -212,6 +212,39 @@ describe('editableToParsed round trip', () => {
       }
     }
   })
+
+  it('editableToParsed carries visualImageDataUrl from EditableOption to ParsedOption', () => {
+    const parsed = makeParsedExam()
+    const editable = parsedToEditable(parsed)
+    const q = editable.questions[0]!
+    const examWithImg: ReturnType<typeof parsedToEditable> = {
+      questions: editable.questions.map(eq =>
+        eq.id !== q.id ? eq : {
+          ...eq,
+          options: eq.options.map((o, i) =>
+            i === 0 ? { ...o, visualImageDataUrl: 'data:image/png;base64,abc' } : o,
+          ),
+        },
+      ),
+    }
+    const back = editableToParsed(examWithImg)
+    expect(back.questions[0]!.options[0]!.visualImageDataUrl).toBe('data:image/png;base64,abc')
+    expect(back.questions[0]!.options[1]!.visualImageDataUrl).toBeUndefined()
+  })
+
+  it('editableToParsed carries visualImageDataUrl from EditableQuestion to ParsedQuestion', () => {
+    const parsed = makeParsedExam()
+    const editable = parsedToEditable(parsed)
+    const q = editable.questions[0]!
+    const examWithImg: ReturnType<typeof parsedToEditable> = {
+      questions: editable.questions.map(eq =>
+        eq.id !== q.id ? eq : { ...eq, visualImageDataUrl: 'data:image/png;base64,xyz' },
+      ),
+    }
+    const back = editableToParsed(examWithImg)
+    expect(back.questions[0]!.visualImageDataUrl).toBe('data:image/png;base64,xyz')
+    expect(back.questions[1]!.visualImageDataUrl).toBeUndefined()
+  })
 })
 
 // ─── setCorrectOption / user changes correct answer ───────────────────────────

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { parseExam } from '@/lib/parser/parseQuestions'
 import { shuffleExam, generateAnswerKey } from '@/lib/shuffle/shuffleExam'
 import { shuffleVisualExam, generateVisualAnswerKey } from '@/lib/shuffle/shuffleVisualExam'
@@ -11,6 +11,9 @@ import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes
 import { parsedToEditable, editableToParsed } from '@/lib/editor/editableExam'
 import { validateEditableExam } from '@/lib/editor/validateEditableExam'
 import type { EditableExam } from '@/lib/editor/editableExam'
+import { saveExam, updateExam, saveShuffledExam, deriveStatus } from '@/lib/storage/examStore'
+import type { StoredExam, ExamSourceType } from '@/lib/storage/types'
+import { migrateLocalStorageDraft } from '@/lib/storage/migrateDraft'
 import ParsedExamPreview from './ParsedExamPreview'
 import ShuffledExamView from './ShuffledExamView'
 import VisualShuffledExamView from './VisualShuffledExamView'
@@ -20,6 +23,7 @@ import ExportButtons from './ExportButtons'
 import FileUpload from './FileUpload'
 import PrintableExam from './PrintableExam'
 import ManualExamEditor from './ManualExamEditor'
+import ExamLibrary from './ExamLibrary'
 
 const SAMPLE_EXAM_TEXT = `1. מה מחזירה הפונקציה getUserName כאשר user_id=123?
 א. היא מחזירה string תקין
@@ -47,6 +51,7 @@ const TEXTAREA_PLACEHOLDER = `שאלה 1
 ד. ""`
 
 export default function ExamShuffler() {
+  // ── Core exam state ────────────────────────────────────────────────────────
   const [rawText, setRawText] = useState('')
   const [parsedExam, setParsedExam] = useState<ParsedExam | null>(null)
   const [editableExam, setEditableExam] = useState<EditableExam | null>(null)
@@ -54,9 +59,24 @@ export default function ExamShuffler() {
   const [answerKey, setAnswerKey] = useState<AnswerKeyRow[] | null>(null)
   const [questionOrder, setQuestionOrder] = useState<'file' | 'numeric'>('file')
 
-  // Parallel visual pipeline state
+  // ── Visual pipeline state ──────────────────────────────────────────────────
   const [visualQuestions, setVisualQuestions] = useState<VisualQuestion[] | null>(null)
   const [shuffledVisualExam, setShuffledVisualExam] = useState<ShuffledVisualExam | null>(null)
+
+  // ── Library / save state ───────────────────────────────────────────────────
+  const [currentExamId, setCurrentExamId] = useState<string | null>(null)
+  const [currentExamTitle, setCurrentExamTitle] = useState<string | null>(null)
+  const [isDirty, setIsDirty] = useState(false)
+  const [showLibrary, setShowLibrary] = useState(false)
+  const [sourceFileName, setSourceFileName] = useState<string | null>(null)
+  const [sourceType, setSourceType] = useState<ExamSourceType>('paste')
+
+  // ── One-time draft migration ───────────────────────────────────────────────
+  useEffect(() => {
+    migrateLocalStorageDraft().catch(() => {})
+  }, [])
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   /** Returns questions in the selected display/shuffle order. Stable: same number → preserve file order. */
   function sortedForOrder(exam: ParsedExam): ParsedQuestion[] {
@@ -72,13 +92,44 @@ export default function ExamShuffler() {
     (parsedExam !== null && parsedExam.questions.length > 0) ||
     (visualQuestions !== null && visualQuestions.length > 0)
 
+  // ── Exam change wrapper (marks dirty) ─────────────────────────────────────
+
+  function handleExamChange(exam: EditableExam) {
+    setEditableExam(exam)
+    setIsDirty(true)
+  }
+
+  // ── Parse / reset ─────────────────────────────────────────────────────────
+
   function handleParse() {
     const result = parseExam(rawText)
     setParsedExam(result)
     setEditableExam(parsedToEditable(result))
     setShuffledExam(null)
     setAnswerKey(null)
+    // Starting a new parse clears the saved-exam link
+    setCurrentExamId(null)
+    setCurrentExamTitle(null)
+    setIsDirty(false)
   }
+
+  function handleReset() {
+    setRawText('')
+    setParsedExam(null)
+    setEditableExam(null)
+    setShuffledExam(null)
+    setAnswerKey(null)
+    setQuestionOrder('file')
+    setVisualQuestions(null)
+    setShuffledVisualExam(null)
+    setCurrentExamId(null)
+    setCurrentExamTitle(null)
+    setIsDirty(false)
+    setSourceFileName(null)
+    setSourceType('paste')
+  }
+
+  // ── Shuffle ───────────────────────────────────────────────────────────────
 
   function handleShuffle() {
     // Visual pipeline takes priority when visual questions are loaded
@@ -95,9 +146,16 @@ export default function ExamShuffler() {
     if (!examToShuffle || examToShuffle.questions.length === 0) return
     const orderedExam: ParsedExam = { questions: sortedForOrder(examToShuffle) }
     const shuffled = shuffleExam(orderedExam)
+    const key = generateAnswerKey(shuffled)
     setShuffledExam(shuffled)
-    setAnswerKey(generateAnswerKey(shuffled))
+    setAnswerKey(key)
+    // Auto-save the shuffled result when this exam is already in the library
+    if (currentExamId) {
+      saveShuffledExam(currentExamId, shuffled, key).catch(() => {})
+    }
   }
+
+  // ── Visual extraction ─────────────────────────────────────────────────────
 
   function handleVisualExtracted(r: VisualExtractionResult) {
     setVisualQuestions(r.visualQuestions)
@@ -105,18 +163,68 @@ export default function ExamShuffler() {
     setAnswerKey(null)
   }
 
-  function handleReset() {
-    setRawText('')
-    setParsedExam(null)
-    setEditableExam(null)
-    setShuffledExam(null)
-    setAnswerKey(null)
-    setQuestionOrder('file')
-    setVisualQuestions(null)
-    setShuffledVisualExam(null)
+  // ── Library CRUD ──────────────────────────────────────────────────────────
+
+  async function handleSaveExam() {
+    if (!editableExam || editableExam.questions.length === 0) {
+      alert('אין מבחן לשמירה.')
+      return
+    }
+    if (currentExamId) {
+      await updateExam(currentExamId, {
+        editableExam,
+        shuffledExam: shuffledExam ?? undefined,
+        answerKey: answerKey ?? undefined,
+        status: deriveStatus(editableExam, !!shuffledExam),
+      })
+    } else {
+      const stored = await saveExam({
+        editableExam,
+        sourceFileName: sourceFileName ?? undefined,
+        sourceType,
+        shuffledExam: shuffledExam ?? undefined,
+        answerKey: answerKey ?? undefined,
+      })
+      setCurrentExamId(stored.id)
+      setCurrentExamTitle(stored.title)
+    }
+    setIsDirty(false)
   }
 
-  const showReset = parsedExam !== null || shuffledExam !== null || visualQuestions !== null || shuffledVisualExam !== null
+  async function handleSaveCopy() {
+    if (!editableExam || editableExam.questions.length === 0) {
+      alert('אין מבחן לשמירה.')
+      return
+    }
+    await saveExam({
+      editableExam,
+      sourceFileName: sourceFileName ?? undefined,
+      sourceType,
+      shuffledExam: shuffledExam ?? undefined,
+      answerKey: answerKey ?? undefined,
+    })
+    // Does NOT update currentExamId — the copy is independent
+  }
+
+  function handleLoadExam(stored: StoredExam) {
+    if (isDirty && !window.confirm('יש שינויים שלא נשמרו. האם להמשיך ולפתוח מבחן אחר?')) return
+    setEditableExam(stored.editableExam)
+    setShuffledExam(stored.shuffledExam ?? null)
+    setAnswerKey(stored.answerKey ?? null)
+    setParsedExam(null)  // let ManualExamEditor be the primary view when loading from library
+    setRawText('')
+    setVisualQuestions(null)
+    setShuffledVisualExam(null)
+    setCurrentExamId(stored.id)
+    setCurrentExamTitle(stored.title)
+    setIsDirty(false)
+    setSourceFileName(stored.sourceFileName ?? null)
+    setSourceType(stored.sourceType)
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const showReset = parsedExam !== null || shuffledExam !== null || visualQuestions !== null || shuffledVisualExam !== null || editableExam !== null
 
   return (
     <>
@@ -125,9 +233,60 @@ export default function ExamShuffler() {
         מערבל תשובות אמריקאיות
       </h1>
 
+      {/* Library toggle — always visible */}
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => setShowLibrary(v => !v)}
+          className="text-sm text-gray-600 hover:text-gray-800 hover:underline"
+        >
+          {showLibrary ? '▲ סגור מבחנים שמורים' : '▼ פתח מבחנים שמורים'}
+        </button>
+      </div>
+
+      {/* Library panel */}
+      {showLibrary && (
+        <ExamLibrary
+          currentExamId={currentExamId}
+          onLoad={exam => {
+            handleLoadExam(exam)
+            setShowLibrary(false)
+          }}
+        />
+      )}
+
+      {/* Save / status bar — shown when an exam is loaded */}
+      {editableExam !== null && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap text-sm" dir="rtl">
+          {currentExamTitle && (
+            <span className="text-gray-500 truncate max-w-xs" title={currentExamTitle}>
+              📖 {currentExamTitle}{isDirty ? ' *' : ''}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={handleSaveExam}
+            className="px-3 py-1 rounded text-white bg-blue-600 hover:bg-blue-700 transition-colors"
+          >
+            שמור מבחן
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveCopy}
+            className="px-3 py-1 rounded text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+          >
+            שמור עותק
+          </button>
+        </div>
+      )}
+
       {/* File upload */}
       <FileUpload
-        onExtracted={(t) => setRawText(t)}
+        onExtracted={(t, meta) => {
+          setRawText(t)
+          setSourceFileName(meta?.fileName ?? null)
+          setSourceType(meta?.sourceType ?? 'paste')
+        }}
         onVisualExtracted={handleVisualExtracted}
       />
 
@@ -150,7 +309,11 @@ export default function ExamShuffler() {
         <textarea
           id="exam-input"
           value={rawText}
-          onChange={e => setRawText(e.target.value)}
+          onChange={e => {
+            setRawText(e.target.value)
+            setSourceType('paste')
+            setSourceFileName(null)
+          }}
           placeholder={TEXTAREA_PLACEHOLDER}
           dir="rtl"
           className="w-full h-48 border border-gray-300 rounded-lg p-3 font-mono text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 resize-y"
@@ -219,7 +382,7 @@ export default function ExamShuffler() {
       {editableExam !== null && (
         <ManualExamEditor
           exam={editableExam}
-          onChange={setEditableExam}
+          onChange={handleExamChange}
         />
       )}
 

@@ -113,4 +113,44 @@ describe('PrintableExam', () => {
     expect(screen.getByText(text)).toBeInTheDocument()
     expect(exam.questions[0].options[0].text).toBe(text)
   })
+
+  it('renders question image when visualImageDataUrl is set on a question', () => {
+    const exam: ShuffledExam = {
+      questions: [{
+        number: 1,
+        questionText: 'שאלה עם תמונה',
+        outputQuestionNumber: 1,
+        options: [makeOption('אפשרות', 0)],
+        visualImageDataUrl: 'data:image/png;base64,qimg',
+      }],
+    }
+    render(<PrintableExam exam={exam} />)
+    const img = screen.getByAltText('תמונה לשאלה 1')
+    expect(img).toBeInTheDocument()
+    expect(img).toHaveAttribute('src', 'data:image/png;base64,qimg')
+  })
+
+  it('renders option image when visualImageDataUrl is set on an option', () => {
+    const exam: ShuffledExam = {
+      questions: [{
+        number: 1,
+        questionText: 'שאלה',
+        outputQuestionNumber: 1,
+        options: [
+          {
+            label: 'א',
+            text: '',
+            originalIndex: 0,
+            isCorrectAnswer: true,
+            visualImageDataUrl: 'data:image/png;base64,oimg',
+          },
+          makeOption('אפשרות ב', 1),
+        ],
+      }],
+    }
+    render(<PrintableExam exam={exam} />)
+    const img = screen.getByAltText('תמונה לתשובה א')
+    expect(img).toBeInTheDocument()
+    expect(img).toHaveAttribute('src', 'data:image/png;base64,oimg')
+  })
 })

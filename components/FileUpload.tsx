@@ -13,8 +13,13 @@ const PDF_MODE_LABELS: Record<PdfMode, string> = {
   visual: 'נאמנות גבוהה',
 }
 
+interface FileMeta {
+  fileName: string
+  sourceType: 'docx' | 'pdf'
+}
+
 interface Props {
-  onExtracted: (text: string) => void
+  onExtracted: (text: string, meta?: FileMeta) => void
   onVisualExtracted?: (result: VisualExtractionResult) => void
 }
 
@@ -31,6 +36,7 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
   const [pdfMode, setPdfMode] = useState<PdfMode>('auto')
   const [ocrProgress, setOcrProgress] = useState<{ page: number; total: number; percent?: number } | null>(null)
   const [usedMode, setUsedMode] = useState<string | null>(null)
+  const [autoModeReason, setAutoModeReason] = useState<string | null>(null)
 
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -44,6 +50,7 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
     setComplexity(null)
     setOcrProgress(null)
     setUsedMode(null)
+    setAutoModeReason(null)
 
     const ext = file.name.split('.').pop()?.toLowerCase()
 
@@ -67,7 +74,7 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
         }
         setStatus('done')
         setPreviewText(result.text.slice(0, 300))
-        onExtracted(result.text)
+        onExtracted(result.text, { fileName: file.name, sourceType: 'docx' })
 
       } else if (pdfMode === 'visual') {
         // High-fidelity visual mode: bypass text pipeline
@@ -96,7 +103,7 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
             setComplexity(textResult.complexity ?? null)
             setPreviewText(textResult.text.slice(0, 300))
             setUsedMode('נאמנות גבוהה (עם חזרה לטקסט)')
-            onExtracted(textResult.text)
+            onExtracted(textResult.text, { fileName: file.name, sourceType: 'pdf' })
           }
           // Note: does NOT call onVisualExtracted — stays in text mode
           return
@@ -106,7 +113,7 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
         setUsedMode('נאמנות גבוהה')
         setStatus('done')
         onVisualExtracted?.(visualResult)
-        onExtracted('')  // satisfies caller contract; ExamShuffler ignores empty string in visual mode
+        onExtracted('', { fileName: file.name, sourceType: 'pdf' })  // satisfies caller contract; ExamShuffler ignores empty string in visual mode
 
       } else {
         // Text-based modes: fast / auto / ocr
@@ -124,7 +131,14 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
         }
 
         if (pdfMode === 'auto') {
-          setUsedMode(ocrWasUsed ? 'אוטומטי (OCR)' : 'אוטומטי (טקסט)')
+          if (result.nativePreferredOverOcr) {
+            setUsedMode('אוטומטי (טקסט — OCR היה פחות טוב)')
+          } else if (ocrWasUsed) {
+            setUsedMode('אוטומטי (OCR)')
+          } else {
+            setUsedMode('אוטומטי (טקסט)')
+          }
+          if (result.autoModeReason) setAutoModeReason(result.autoModeReason)
         } else {
           setUsedMode(PDF_MODE_LABELS[pdfMode])
         }
@@ -134,7 +148,7 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
         if (result.quality) setQuality(result.quality)
         setComplexity(result.complexity ?? null)
         setPreviewText(result.text.slice(0, 300))
-        onExtracted(result.text)
+        onExtracted(result.text, { fileName: file.name, sourceType: 'pdf' })
       }
     } catch {
       setStatus('error')
@@ -228,6 +242,9 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
             <p className="text-blue-600 mt-1">
               זוהה מבנה מורכב — נסה מצב נאמנות גבוהה לשאלות עם גרפים וטבלאות
             </p>
+          )}
+          {autoModeReason && (
+            <p className="text-blue-500 mt-1">{autoModeReason}</p>
           )}
         </div>
       )}

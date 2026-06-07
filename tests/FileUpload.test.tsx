@@ -51,7 +51,7 @@ describe('FileUpload', () => {
     })
 
     await waitFor(() => {
-      expect(onExtracted).toHaveBeenCalledWith('שאלה 1\nא. כן\nב. לא')
+      expect(onExtracted).toHaveBeenCalledWith('שאלה 1\nא. כן\nב. לא', { fileName: 'exam.docx', sourceType: 'docx' })
     })
   })
 
@@ -127,7 +127,7 @@ describe('FileUpload', () => {
     })
 
     await waitFor(() => {
-      expect(onExtracted).toHaveBeenCalledWith('שאלה 1\nא. כן\nב. לא')
+      expect(onExtracted).toHaveBeenCalledWith('שאלה 1\nא. כן\nב. לא', { fileName: 'exam.pdf', sourceType: 'pdf' })
     })
     expect(mockExtractPdfHybrid).toHaveBeenCalledWith(
       expect.any(ArrayBuffer),

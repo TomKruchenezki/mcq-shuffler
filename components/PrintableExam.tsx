@@ -17,6 +17,14 @@ export default function PrintableExam({ exam, title = 'מבחן מעורבב' }:
           <p dir="rtl" style={{ fontWeight: 'bold', marginBottom: '0.5rem', unicodeBidi: 'plaintext', whiteSpace: 'pre-wrap' }}>
             {q.outputQuestionNumber}. {q.questionText}
           </p>
+          {q.visualImageDataUrl && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={q.visualImageDataUrl}
+              alt={`תמונה לשאלה ${q.outputQuestionNumber}`}
+              style={{ maxWidth: '100%', height: 'auto', display: 'block', margin: '0.5rem 0' }}
+            />
+          )}
           <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {q.options.map(opt => (
               <li key={opt.originalIndex} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
@@ -26,6 +34,14 @@ export default function PrintableExam({ exam, title = 'מבחן מעורבב' }:
                 <span style={{ unicodeBidi: 'plaintext', whiteSpace: 'pre-wrap' }}>
                   {opt.text}
                 </span>
+                {opt.visualImageDataUrl && (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={opt.visualImageDataUrl}
+                    alt={`תמונה לתשובה ${opt.label}`}
+                    style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+                  />
+                )}
               </li>
             ))}
           </ol>

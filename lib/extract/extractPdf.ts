@@ -19,6 +19,10 @@ export interface PdfExtractionResult {
   error?: string
   quality?: PdfExtractionQuality
   complexity?: ComplexityFlags
+  /** Hebrew explanation of auto-mode selection choice (shown in FileUpload UI). */
+  autoModeReason?: string
+  /** true when OCR was run but native extraction was ultimately preferred (auto mode only). */
+  nativePreferredOverOcr?: boolean
 }
 
 const SCANNED_THRESHOLD = 100

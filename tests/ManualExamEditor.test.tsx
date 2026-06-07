@@ -171,4 +171,51 @@ describe('ManualExamEditor', () => {
     render(<ManualExamEditor exam={{ questions: [] }} onChange={() => {}} />)
     expect(screen.getByText(/אין שאלות/)).toBeInTheDocument()
   })
+
+  it('question with visualImageDataUrl renders image preview and מחק תמונה button', () => {
+    const exam = makeExam()
+    const examWithImg: EditableExam = {
+      questions: exam.questions.map((q, i) =>
+        i === 0 ? { ...q, visualImageDataUrl: 'data:image/png;base64,qtest' } : q,
+      ),
+    }
+    render(<ManualExamEditor exam={examWithImg} onChange={() => {}} />)
+    expect(screen.getByAltText('תמונה לשאלה')).toBeInTheDocument()
+    expect(screen.getByText('מחק תמונה')).toBeInTheDocument()
+  })
+
+  it('clicking מחק תמונה calls onChange with undefined visualImageDataUrl', () => {
+    const exam = makeExam()
+    const examWithImg: EditableExam = {
+      questions: exam.questions.map((q, i) =>
+        i === 0 ? { ...q, visualImageDataUrl: 'data:image/png;base64,qtest' } : q,
+      ),
+    }
+    const onChange = vi.fn()
+    render(<ManualExamEditor exam={examWithImg} onChange={onChange} />)
+    fireEvent.click(screen.getByText('מחק תמונה'))
+    expect(onChange).toHaveBeenCalledOnce()
+    const updated: EditableExam = onChange.mock.calls[0][0]
+    expect(updated.questions[0]!.visualImageDataUrl).toBeUndefined()
+  })
+
+  it('option with visualImageDataUrl renders image thumbnail', () => {
+    const exam = makeExam()
+    const q = exam.questions[0]!
+    const examWithImg: EditableExam = {
+      questions: exam.questions.map((eq, i) =>
+        i !== 0 ? eq : {
+          ...eq,
+          options: eq.options.map((o, oi) =>
+            oi === 0 ? { ...o, visualImageDataUrl: 'data:image/png;base64,otest' } : o,
+          ),
+        },
+      ),
+    }
+    render(<ManualExamEditor exam={examWithImg} onChange={() => {}} />)
+    // The first option of question 1 has label 'א'
+    expect(screen.getByAltText(`תמונה לתשובה א`)).toBeInTheDocument()
+    // Suppress unused variable warning
+    void q
+  })
 })

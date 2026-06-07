@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { HEBREW_LABELS } from '@/lib/shuffle/shuffleExam'
 import type {
   EditableExam,
@@ -24,6 +24,8 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DRAFT_KEY = 'mcq-shuffler-draft'
+/** LocalStorage safety threshold: warn the user if the draft exceeds this size. */
+const MAX_IMAGE_BYTES = 3_500_000
 
 const REVIEW_STATUS_LABELS: Record<EditableReviewStatus, string> = {
   'ok': '✅ תקין',
@@ -47,6 +49,17 @@ const REVIEW_STATUS_BADGE: Record<EditableReviewStatus, string> = {
   'missing-visual-content': 'bg-orange-100 text-orange-700',
   'suspicious-number': 'bg-amber-100 text-amber-700',
   'incomplete': 'bg-red-100 text-red-700',
+}
+
+// ─── Image helper ─────────────────────────────────────────────────────────────
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = e => resolve(e.target!.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
 }
 
 // ─── Draft helpers ────────────────────────────────────────────────────────────
@@ -80,8 +93,14 @@ interface Props {
 
 export default function ManualExamEditor({ exam, onChange }: Props) {
   const [draftExists, setDraftExists] = useState(() => hasDraftInStorage())
+  const [focusedQuestionId, setFocusedQuestionId] = useState<string | null>(null)
 
   function handleSaveDraft() {
+    const serialized = JSON.stringify(exam)
+    if (serialized.length > MAX_IMAGE_BYTES) {
+      alert('הטיוטה גדולה מדי לשמירה מקומית — התמונות גדולות מדי. נסה להקטין את התמונות.')
+      return
+    }
     saveDraftToStorage(exam)
     setDraftExists(true)
   }
@@ -105,8 +124,25 @@ export default function ManualExamEditor({ exam, onChange }: Props) {
     })
   }
 
+  async function handlePaste(e: React.ClipboardEvent<HTMLElement>) {
+    const items = Array.from(e.clipboardData.items)
+    const imageItem = items.find(it => it.type.startsWith('image/'))
+    if (!imageItem || !focusedQuestionId) return
+    e.preventDefault()
+    const file = imageItem.getAsFile()
+    if (!file) return
+    const dataUrl = await readFileAsDataUrl(file)
+    onChange({
+      questions: exam.questions.map(q =>
+        q.id === focusedQuestionId
+          ? { ...q, visualImageDataUrl: dataUrl, reviewStatus: 'manually-edited' as const }
+          : q,
+      ),
+    })
+  }
+
   return (
-    <section className="my-6 space-y-4" dir="rtl">
+    <section className="my-6 space-y-4" dir="rtl" onPaste={handlePaste}>
       {/* Section heading */}
       <h2 className="text-xl font-bold text-gray-800">
         עריכה ידנית לפני ערבוב
@@ -190,6 +226,7 @@ export default function ManualExamEditor({ exam, onChange }: Props) {
           onMoveOption={(optId, dir) => onChange(moveOption(exam, q.id, optId, dir))}
           onSetCorrect={optId => onChange(setCorrectOption(exam, q.id, optId))}
           onUpdateOptionText={(optId, text) => onChange(updateOptionText(exam, q.id, optId, text))}
+          onFocusCard={() => setFocusedQuestionId(q.id)}
         />
       ))}
 
@@ -218,6 +255,8 @@ interface QuestionCardProps {
   onMoveOption: (optId: string, dir: 'up' | 'down') => void
   onSetCorrect: (optId: string) => void
   onUpdateOptionText: (optId: string, text: string) => void
+  /** Called when any child receives focus; used to track which card is active for paste. */
+  onFocusCard: () => void
 }
 
 function QuestionCard({
@@ -234,8 +273,10 @@ function QuestionCard({
   onMoveOption,
   onSetCorrect,
   onUpdateOptionText,
+  onFocusCard,
 }: QuestionCardProps) {
   const [showNotes, setShowNotes] = useState(false)
+  const qImgRef = useRef<HTMLInputElement>(null)
 
   const noCorrectAnswer =
     q.correctOptionId === null || !q.options.some(o => o.id === q.correctOptionId)
@@ -245,8 +286,20 @@ function QuestionCard({
     onChange({ ...q, text, reviewStatus })
   }
 
+  async function handleQuestionImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const dataUrl = await readFileAsDataUrl(file)
+    onChange({ ...q, visualImageDataUrl: dataUrl, reviewStatus: 'manually-edited' })
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+  }
+
   return (
-    <article className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+    <article
+      className="bg-white rounded-xl border border-gray-200 p-5 space-y-3"
+      onFocusCapture={onFocusCard}
+    >
       {/* ── Header row ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 flex-wrap">
         <label className="text-gray-500 text-sm" htmlFor={`qnum-${q.id}`}>שאלה</label>
@@ -327,6 +380,42 @@ function QuestionCard({
         aria-label={`טקסט שאלה ${q.outputQuestionNumber}`}
       />
 
+      {/* ── Question image ──────────────────────────────────────────────────── */}
+      {q.visualImageDataUrl ? (
+        <div className="flex items-start gap-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={q.visualImageDataUrl}
+            alt="תמונה לשאלה"
+            className="max-w-xs max-h-40 rounded border object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => onChange({ ...q, visualImageDataUrl: undefined })}
+            className="text-xs text-red-500 hover:text-red-700"
+          >
+            מחק תמונה
+          </button>
+        </div>
+      ) : (
+        <>
+          <input
+            ref={qImgRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={handleQuestionImageSelect}
+          />
+          <button
+            type="button"
+            onClick={() => qImgRef.current?.click()}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            + הוסף תמונה לשאלה
+          </button>
+        </>
+      )}
+
       {/* ── Status + notes toggle ───────────────────────────────────────────── */}
       <div className="flex gap-3 items-center text-sm flex-wrap">
         <select
@@ -376,6 +465,14 @@ function QuestionCard({
             onMoveDown={() => onMoveOption(opt.id, 'down')}
             onDelete={() => onDeleteOption(opt.id)}
             canDelete={q.options.length > 1}
+            onUpdateImage={dataUrl =>
+              onChange({
+                ...q,
+                options: q.options.map(o =>
+                  o.id === opt.id ? { ...o, visualImageDataUrl: dataUrl } : o,
+                ),
+              })
+            }
           />
         ))}
       </ol>
@@ -406,6 +503,7 @@ interface OptionRowProps {
   onMoveDown: () => void
   onDelete: () => void
   canDelete: boolean
+  onUpdateImage: (dataUrl: string | undefined) => void
 }
 
 function OptionRow({
@@ -420,11 +518,22 @@ function OptionRow({
   onMoveDown,
   onDelete,
   canDelete,
+  onUpdateImage,
 }: OptionRowProps) {
   const label = HEBREW_LABELS[optIdx] ?? String(optIdx + 1)
+  const optImgRef = useRef<HTMLInputElement>(null)
+
+  async function handleOptionImageSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const dataUrl = await readFileAsDataUrl(file)
+    onUpdateImage(dataUrl)
+    // Reset so the same file can be re-selected
+    e.target.value = ''
+  }
 
   return (
-    <li className="flex items-center gap-2">
+    <li className="flex items-center gap-2 flex-wrap">
       {/* Correct-answer radio */}
       <input
         type="radio"
@@ -452,6 +561,42 @@ function OptionRow({
         className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
         aria-label={`טקסט תשובה ${label}`}
       />
+
+      {/* Option image — thumbnail+delete or upload button */}
+      {opt.visualImageDataUrl ? (
+        <div className="flex items-center gap-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={opt.visualImageDataUrl}
+            alt={`תמונה לתשובה ${label}`}
+            className="max-h-10 rounded border object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => onUpdateImage(undefined)}
+            title="מחק תמונה"
+            aria-label={`מחק תמונה לתשובה ${label}`}
+            className="text-xs text-red-500 hover:text-red-700"
+          >✕</button>
+        </div>
+      ) : (
+        <>
+          <input
+            ref={optImgRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={handleOptionImageSelect}
+          />
+          <button
+            type="button"
+            onClick={() => optImgRef.current?.click()}
+            title="הוסף תמונה לתשובה"
+            aria-label={`הוסף תמונה לתשובה ${label}`}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >🖼</button>
+        </>
+      )}
 
       {/* Move up/down */}
       <button
