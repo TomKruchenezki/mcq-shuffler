@@ -255,4 +255,28 @@ describe('FileUpload', () => {
       expect(mockExtractPdfVisual).toHaveBeenCalled()
     })
   })
+
+  it('shows large-PDF warning text before OCR pages are processed', async () => {
+    // extractPdfOcr emits onProgress(0, N) before page 1 starts for large PDFs.
+    // The deferred promise keeps ocrProgress alive long enough to assert the UI.
+    let resolveExtract!: (v: any) => void
+    mockExtractPdfHybrid.mockImplementation(async (_buf, _mode, onProgress) => {
+      onProgress?.(0, 15)  // pre-OCR large-PDF signal
+      return new Promise(resolve => { resolveExtract = resolve })
+    })
+
+    render(<FileUpload onExtracted={() => {}} />)
+    const input = document.querySelector('input[type="file"]')!
+    // Start upload without awaiting — inspect mid-flight state
+    act(() => { uploadFile(input, new File(['dummy pdf'], 'exam.pdf')) })
+
+    await waitFor(() => {
+      expect(screen.getByText(/קובץ PDF גדול/)).toBeInTheDocument()
+    })
+
+    // Resolve the deferred promise to clean up
+    await act(async () => {
+      resolveExtract({ text: '', quality: null })
+    })
+  })
 })

@@ -80,4 +80,37 @@ describe('PrintableExam', () => {
     render(<PrintableExam exam={exam} />)
     expect(JSON.stringify(exam)).toBe(snapshot)
   })
+
+  it('option text spans have unicodeBidi plaintext style', () => {
+    const exam = makeExam([['ערך נכון', 'ערך שגוי']])
+    const { container } = render(<PrintableExam exam={exam} />)
+    const lis = container.querySelectorAll('li')
+    lis.forEach(li => {
+      const spans = li.querySelectorAll('span')
+      const textSpan = spans[spans.length - 1]  // last span = option text (first = label)
+      expect(textSpan).toHaveStyle({ unicodeBidi: 'plaintext' })
+    })
+  })
+
+  it('option text spans have whiteSpace pre-wrap style', () => {
+    const exam = makeExam([['ערך נכון', 'ערך שגוי']])
+    const { container } = render(<PrintableExam exam={exam} />)
+    const lis = container.querySelectorAll('li')
+    lis.forEach(li => {
+      const spans = li.querySelectorAll('span')
+      const textSpan = spans[spans.length - 1]
+      expect(textSpan).toHaveStyle({ whiteSpace: 'pre-wrap' })
+    })
+  })
+
+  it('does not inject hidden direction marks into rendered option text', () => {
+    const text = 'SELECT * FROM users WHERE id = 5'
+    const exam: ShuffledExam = {
+      questions: [makeQuestion(1, [text, 'אפשרות ב'])],
+    }
+    render(<PrintableExam exam={exam} />)
+    // screen.getByText would fail if wrapLtr were accidentally called (adds U+202A/U+202C)
+    expect(screen.getByText(text)).toBeInTheDocument()
+    expect(exam.questions[0].options[0].text).toBe(text)
+  })
 })

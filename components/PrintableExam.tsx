@@ -14,8 +14,8 @@ export default function PrintableExam({ exam, title = 'מבחן מעורבב' }:
 
       {exam.questions.map(q => (
         <article key={q.number} className="printable-question">
-          <p dir="rtl" style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
-            {q.number}. {q.questionText}
+          <p dir="rtl" style={{ fontWeight: 'bold', marginBottom: '0.5rem', unicodeBidi: 'plaintext', whiteSpace: 'pre-wrap' }}>
+            {q.outputQuestionNumber}. {q.questionText}
           </p>
           <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {q.options.map(opt => (
@@ -23,7 +23,7 @@ export default function PrintableExam({ exam, title = 'מבחן מעורבב' }:
                 <span style={{ flexShrink: 0, fontWeight: 'bold', minWidth: '1.5rem', textAlign: 'right' }}>
                   {opt.label}.
                 </span>
-                <span dir="auto">
+                <span style={{ unicodeBidi: 'plaintext', whiteSpace: 'pre-wrap' }}>
                   {opt.text}
                 </span>
               </li>

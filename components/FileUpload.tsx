@@ -193,9 +193,11 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
 
       {ocrProgress && (
         <p className="mt-2 text-sm text-blue-600" dir="rtl">
-          {pdfMode === 'visual'
-            ? `מעבד עמוד ${ocrProgress.page} מתוך ${ocrProgress.total}…`
-            : `מריץ OCR על עמוד ${ocrProgress.page} מתוך ${ocrProgress.total}${ocrProgress.percent != null ? ` (${ocrProgress.percent}%)` : ''}…`}
+          {ocrProgress.page === 0
+            ? 'קובץ PDF גדול — OCR מקומי עלול לקחת כמה דקות. כל העיבוד מתבצע בדפדפן.'
+            : pdfMode === 'visual'
+              ? `מעבד עמוד ${ocrProgress.page} מתוך ${ocrProgress.total}…`
+              : `מריץ OCR על עמוד ${ocrProgress.page} מתוך ${ocrProgress.total}${ocrProgress.percent != null ? ` (${ocrProgress.percent}%)` : ''}…`}
         </p>
       )}
 

@@ -22,6 +22,10 @@ export default function VisualShuffledExamView({ exam }: Props) {
         >
           <div className="flex items-start gap-2">
             <span className="font-semibold text-blue-600 flex-shrink-0">{q.number}.</span>
+            {/* visual-content badge — all visual-mode questions contain visual content */}
+            <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full self-center">
+              📊 תוכן חזותי
+            </span>
             <img
               src={q.stemDataUrl}
               alt={`שאלה ${q.number}`}

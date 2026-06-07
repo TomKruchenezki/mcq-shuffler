@@ -14,6 +14,17 @@ export function containsHebrew(text: string): boolean {
 const LTR_EMBED = '‪'  // LEFT-TO-RIGHT EMBEDDING
 const POP_DIR   = '‬'  // POP DIRECTIONAL FORMATTING
 
+/**
+ * Wraps `text` in U+202A (LEFT-TO-RIGHT EMBEDDING) / U+202C (POP DIRECTIONAL FORMATTING)
+ * Unicode marks so that an LTR run (code snippet, SQL, English term, number, formula)
+ * renders correctly when embedded inside an RTL paragraph.
+ *
+ * @renderOnly — ONLY safe to call in render/display/export contexts (JSX, DOCX XML).
+ * NEVER call this on text that will be stored in ParsedQuestion, ShuffledQuestion,
+ * or any data structure that is exported, persisted, or used as input to further
+ * parsing, shuffling, or answer-key generation. Doing so would inject hidden Unicode
+ * direction marks into stored exam data.
+ */
 export function wrapLtr(text: string): string {
   return `${LTR_EMBED}${text}${POP_DIR}`
 }

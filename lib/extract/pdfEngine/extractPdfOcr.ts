@@ -17,6 +17,9 @@ export async function extractPdfOcr(
 
   try {
     const rawPages: string[] = []
+    if (pdf.numPages > LARGE_PDF_THRESHOLD) {
+      onProgress?.(0, pdf.numPages)  // pre-OCR large-PDF signal; shown before page 1 starts
+    }
     for (let i = 1; i <= pdf.numPages; i++) {
       onProgress?.(i, pdf.numPages)
       const page = await pdf.getPage(i)
