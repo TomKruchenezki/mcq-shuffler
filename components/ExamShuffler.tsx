@@ -8,6 +8,9 @@ import type { ParsedExam, ParsedQuestion } from '@/lib/parser/parseQuestions'
 import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
 import type { VisualQuestion, ShuffledVisualExam } from '@/lib/extract/pdfEngine/visualTypes'
 import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes'
+import { parsedToEditable, editableToParsed } from '@/lib/editor/editableExam'
+import { validateEditableExam } from '@/lib/editor/validateEditableExam'
+import type { EditableExam } from '@/lib/editor/editableExam'
 import ParsedExamPreview from './ParsedExamPreview'
 import ShuffledExamView from './ShuffledExamView'
 import VisualShuffledExamView from './VisualShuffledExamView'
@@ -16,6 +19,7 @@ import AnswerKeyTable from './AnswerKeyTable'
 import ExportButtons from './ExportButtons'
 import FileUpload from './FileUpload'
 import PrintableExam from './PrintableExam'
+import ManualExamEditor from './ManualExamEditor'
 
 const SAMPLE_EXAM_TEXT = `1. מה מחזירה הפונקציה getUserName כאשר user_id=123?
 א. היא מחזירה string תקין
@@ -45,6 +49,7 @@ const TEXTAREA_PLACEHOLDER = `שאלה 1
 export default function ExamShuffler() {
   const [rawText, setRawText] = useState('')
   const [parsedExam, setParsedExam] = useState<ParsedExam | null>(null)
+  const [editableExam, setEditableExam] = useState<EditableExam | null>(null)
   const [shuffledExam, setShuffledExam] = useState<ShuffledExam | null>(null)
   const [answerKey, setAnswerKey] = useState<AnswerKeyRow[] | null>(null)
   const [questionOrder, setQuestionOrder] = useState<'file' | 'numeric'>('file')
@@ -63,12 +68,14 @@ export default function ExamShuffler() {
   }
 
   const canShuffle =
+    (editableExam !== null && editableExam.questions.length > 0) ||
     (parsedExam !== null && parsedExam.questions.length > 0) ||
     (visualQuestions !== null && visualQuestions.length > 0)
 
   function handleParse() {
     const result = parseExam(rawText)
     setParsedExam(result)
+    setEditableExam(parsedToEditable(result))
     setShuffledExam(null)
     setAnswerKey(null)
   }
@@ -81,8 +88,12 @@ export default function ExamShuffler() {
       setAnswerKey(generateVisualAnswerKey(shuffled))
       return
     }
-    if (!parsedExam) return
-    const orderedExam: ParsedExam = { questions: sortedForOrder(parsedExam) }
+    // Use editableExam (post-manual-edit) if available, otherwise fall back to parsedExam
+    const examToShuffle = editableExam
+      ? editableToParsed(editableExam)
+      : parsedExam
+    if (!examToShuffle || examToShuffle.questions.length === 0) return
+    const orderedExam: ParsedExam = { questions: sortedForOrder(examToShuffle) }
     const shuffled = shuffleExam(orderedExam)
     setShuffledExam(shuffled)
     setAnswerKey(generateAnswerKey(shuffled))
@@ -97,6 +108,7 @@ export default function ExamShuffler() {
   function handleReset() {
     setRawText('')
     setParsedExam(null)
+    setEditableExam(null)
     setShuffledExam(null)
     setAnswerKey(null)
     setQuestionOrder('file')
@@ -202,6 +214,50 @@ export default function ExamShuffler() {
           exam={{ questions: sortedForOrder(parsedExam) }}
         />
       )}
+
+      {/* Manual exam editor — shown after parsing */}
+      {editableExam !== null && (
+        <ManualExamEditor
+          exam={editableExam}
+          onChange={setEditableExam}
+        />
+      )}
+
+      {/* Validation summary + secondary shuffle button */}
+      {editableExam !== null && (() => {
+        const validation = validateEditableExam(editableExam)
+        const hasWarnings = validation.warnings.length > 0
+        return (
+          <div className="mt-2 mb-4 p-4 rounded-xl border border-gray-200 bg-gray-50 space-y-2" dir="rtl">
+            <div className="flex items-center gap-3 flex-wrap text-sm font-medium">
+              <span className="text-green-700">✅ {validation.counts.ok} תקינות</span>
+              {validation.counts.noCorrectAnswer > 0 && (
+                <span className="text-red-600">❌ {validation.counts.noCorrectAnswer} ללא תשובה נכונה</span>
+              )}
+              {validation.counts.tooFewOptions > 0 && (
+                <span className="text-red-600">⚠ {validation.counts.tooFewOptions} עם פחות מ-2 תשובות</span>
+              )}
+              {validation.counts.emptyOptions > 0 && (
+                <span className="text-amber-600">⚠ {validation.counts.emptyOptions} עם תשובות ריקות</span>
+              )}
+              {validation.counts.missingVisualContent > 0 && (
+                <span className="text-orange-600">📊 {validation.counts.missingVisualContent} חסרות תוכן חזותי</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={handleShuffle}
+              className={`px-5 py-2 rounded-lg font-semibold text-white transition-colors ${
+                hasWarnings
+                  ? 'bg-amber-500 hover:bg-amber-600'
+                  : 'bg-green-600 hover:bg-green-700'
+              }`}
+            >
+              {hasWarnings ? 'המשך לערבוב למרות האזהרות ↓' : 'המשך לערבוב ↓'}
+            </button>
+          </div>
+        )
+      })()}
 
       {/* Shuffled exam — text mode */}
       {shuffledExam !== null && <ShuffledExamView exam={shuffledExam} />}
