@@ -11,11 +11,21 @@ export interface ParsedOption {
   isOriginalCorrectAnswer: boolean
 }
 
+export type QuestionStatus =
+  | 'ok'
+  | 'few-options'         // < 2 options
+  | 'visual-content'      // keywords suggest diagram/table/graph
+  | 'suspicious-number'   // source number is 0 or implausibly large
+  | 'huge-block'          // questionText.length > 500 (likely merged questions)
+
 export interface ParsedQuestion {
-  number: number
+  number: number               // source number from PDF (kept for diagnostics)
+  sequenceIndex: number        // 0-based position in extracted text; stable across sort/reorder
+  outputQuestionNumber: number // always 1,2,3... = sequenceIndex + 1; use for display/export
   questionText: string
   options: ParsedOption[]
-  sequenceIndex: number  // 0-based position in extracted text; stable across sort/reorder
+  status: QuestionStatus
+  hasVisualContent: boolean    // detected from text keywords or blank options
 }
 
 export interface ParsedExam {
@@ -35,14 +45,37 @@ const RE_PERIOD = /^(\d+)\.(?:\s+(.+)|\s*$)/
 // "N) text" or "N)" alone
 const RE_PAREN = /^(\d+)\)(?:\s+(.+)|\s*$)/
 // ".N" — RTL/PDF-flipped period-number, e.g. ".2" at start of line
-const RE_RTL_PERIOD = /^\.(\d+)\b/
+// Restricted to 1-2 digits to prevent matching ".70" (from decimal 0.70)
+const RE_RTL_PERIOD = /^\.(\d{1,2})\b/
 // Hebrew א–ת (full alphabet) or Latin A–Z, with . or ) delimiter
 const RE_OPTION = /^([א-ת]|[A-Z])[.)]\s*(.*)/
+
+// Keywords that suggest a question references a visual element (graph, table, diagram, etc.)
+const VISUAL_CONTENT_PATTERNS: RegExp[] = [
+  /נתוי?נ[הת]\s+ה(?:דיאגרמה|גרף|טבלה|סכמה|erd|ציור|תרשים)/i,
+  /ב(?:גרף|טבלה|דיאגרמה|תרשים)/,
+  /הגרף\s+הבא/,
+  /הטבלה\s+הבא/,
+]
+
+function hasVisualKeywords(text: string): boolean {
+  return VISUAL_CONTENT_PATTERNS.some(re => re.test(text))
+}
 
 interface AccOption {
   label: string
   index: number
   textParts: string[]
+}
+
+function optionsAreAllBlank(options: AccOption[]): boolean {
+  // Detects PDF options that are likely visual (images/diagrams) rather than text:
+  // their extracted text is empty or a single noise character (≤ 1 char).
+  // Two-letter Hebrew words like "כן"/"לא" (length 2) are valid text and not blank.
+  return (
+    options.length >= 2 &&
+    options.every(o => o.textParts.join(' ').trim().length <= 1)
+  )
 }
 
 interface AccQuestion {
@@ -62,11 +95,25 @@ function flushOption(acc: AccOption): ParsedOption {
 }
 
 function flushQuestion(acc: AccQuestion): ParsedQuestion {
+  const questionText = acc.questionTextParts.join(' ').trim()
+  const options = acc.options.map(flushOption)
+  const hasVisualContent = hasVisualKeywords(questionText) || optionsAreAllBlank(acc.options)
+  const outputQuestionNumber = acc.sequenceIndex + 1
+
+  let status: QuestionStatus = 'ok'
+  if (acc.number === 0) status = 'suspicious-number'
+  else if (options.length < 2) status = 'few-options'
+  else if (questionText.length > 500) status = 'huge-block'
+  else if (hasVisualContent) status = 'visual-content'
+
   return {
     number: acc.number,
-    questionText: acc.questionTextParts.join(' ').trim(),
-    options: acc.options.map(flushOption),
     sequenceIndex: acc.sequenceIndex,
+    outputQuestionNumber,
+    questionText,
+    options,
+    status,
+    hasVisualContent,
   }
 }
 
@@ -130,6 +177,9 @@ export function parseExam(rawText: string): ParsedExam {
     }
     } // end else (RE_REVERSED_FULL)
 
+    // Guard: a parsed number of 0 or negative is not a valid question number
+    if (questionNumber !== null && questionNumber <= 0) questionNumber = null
+
     if (questionNumber !== null) {
       if (currentOption !== null && currentQuestion !== null) {
         currentQuestion.options.push(currentOption)
@@ -189,6 +239,8 @@ export interface ParseDiagnostics {
   questionNumbers: number[]
   duplicateQuestionNumbers: number[]
   nonSequentialNumbers: number[]  // question numbers where q.number < previous q.number (likely mis-read digit)
+  hasVisualContentCount: number   // questions with visual-content status
+  needsReviewCount: number        // questions with any non-ok status
 }
 
 export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
@@ -206,6 +258,9 @@ export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
     if (curr.number < prev.number) nonSequential.push(curr.number)
   }
 
+  const hasVisualContentCount = exam.questions.filter(q => q.hasVisualContent).length
+  const needsReviewCount = exam.questions.filter(q => q.status !== 'ok').length
+
   return {
     parsedQuestionCount: exam.questions.length,
     questionsWithFewerThanTwoOptions: exam.questions
@@ -217,5 +272,7 @@ export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
     questionNumbers: numbers,
     duplicateQuestionNumbers: [...new Set(duplicates)],
     nonSequentialNumbers: nonSequential,
+    hasVisualContentCount,
+    needsReviewCount,
   }
 }

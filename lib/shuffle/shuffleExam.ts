@@ -17,7 +17,8 @@ export interface ShuffledQuestion {
   number: number
   questionText: string
   options: ShuffledOption[]
-  sequenceIndex?: number  // carried from ParsedQuestion; used for stable ordering references
+  sequenceIndex?: number       // carried from ParsedQuestion; used for stable ordering references
+  outputQuestionNumber: number // always sequential 1,2,3... = sequenceIndex + 1
 }
 
 export interface ShuffledExam {
@@ -56,6 +57,7 @@ function shuffleQuestion(q: ParsedQuestion, rng: () => number): ShuffledQuestion
         isCorrectAnswer: opt.isOriginalCorrectAnswer,
       })),
       sequenceIndex: q.sequenceIndex,
+      outputQuestionNumber: q.outputQuestionNumber,
     }
   }
 
@@ -81,6 +83,7 @@ function shuffleQuestion(q: ParsedQuestion, rng: () => number): ShuffledQuestion
       isCorrectAnswer: opts[origIdx].isOriginalCorrectAnswer,
     })),
     sequenceIndex: q.sequenceIndex,
+    outputQuestionNumber: q.outputQuestionNumber,
   }
 }
 
@@ -96,7 +99,7 @@ export function generateAnswerKey(exam: ShuffledExam): AnswerKeyRow[] {
     const correct = q.options.find(o => o.isCorrectAnswer)
     if (correct === undefined) continue
     rows.push({
-      questionNumber: q.number,
+      questionNumber: q.outputQuestionNumber,  // always sequential 1,2,3...
       correctAnswerText: correct.text,
       newCorrectLabel: correct.label,
       newCorrectIndex: q.options.indexOf(correct),

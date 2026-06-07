@@ -19,7 +19,7 @@ interface PositionedItem {
 }
 
 const Y_TOLERANCE = 3.0
-const SPACE_THRESHOLD_FACTOR = 0.25
+const SPACE_THRESHOLD_FACTOR = 0.35
 
 /**
  * Reconstructs readable plain text from a single PDF page's text items.

@@ -11,7 +11,7 @@ export async function exportDocxBuffer(
   paragraphs.push(rtlParagraph(title, { bold: true, size: 28 }))
   paragraphs.push(rtlParagraph(''))
   for (const q of exam.questions) {
-    paragraphs.push(rtlParagraph(`${q.number}. ${q.questionText}`, { bold: true }))
+    paragraphs.push(rtlParagraph(`${q.outputQuestionNumber}. ${q.questionText}`, { bold: true }))
     for (const opt of q.options) {
       paragraphs.push(rtlParagraph(`${opt.label}. ${opt.text}`))
     }

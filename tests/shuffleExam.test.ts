@@ -28,6 +28,9 @@ function makeQuestion(num: number, text: string, opts: string[], seqIdx = 0): Pa
     questionText: text,
     options: opts.map((t, i) => makeOption(t, i)),
     sequenceIndex: seqIdx,
+    outputQuestionNumber: seqIdx + 1,
+    status: 'ok',
+    hasVisualContent: false,
   }
 }
 
@@ -103,6 +106,9 @@ describe('shuffleExam — structure preservation', () => {
       questionText: 'שורה ראשונה\nשורה שניה\nשורה שלישית',
       options: [makeOption('A', 0), makeOption('B', 1)],
       sequenceIndex: 0,
+      outputQuestionNumber: 1,
+      status: 'ok',
+      hasVisualContent: false,
     }
     const shuffled = shuffleExam(makeExam(multiLineQ))
     expect(shuffled.questions[0].questionText).toBe('שורה ראשונה\nשורה שניה\nשורה שלישית')
@@ -373,7 +379,15 @@ describe('shuffleExam — edge cases', () => {
   })
 
   it('question with zero options — no crash', () => {
-    const q: ParsedQuestion = { number: 1, questionText: 'Q', options: [], sequenceIndex: 0 }
+    const q: ParsedQuestion = {
+      number: 1,
+      questionText: 'Q',
+      options: [],
+      sequenceIndex: 0,
+      outputQuestionNumber: 1,
+      status: 'ok',
+      hasVisualContent: false,
+    }
     const result = shuffleExam(makeExam(q))
     expect(result.questions[0].options).toHaveLength(0)
   })
@@ -438,25 +452,26 @@ describe('generateAnswerKey', () => {
     expect(shuffled.questions[0].options[row.newCorrectIndex].label).toBe(row.newCorrectLabel)
   })
 
-  it('question numbers in key match original question numbers', () => {
+  it('question numbers in key are sequential outputQuestionNumbers', () => {
+    // Source numbers 5 and 10, but sequential positions 0 and 1 → outputQN 1 and 2
     const exam = makeExam(
-      makeQuestion(5, 'Q5', ['A', 'B']),
-      makeQuestion(10, 'Q10', ['X', 'Y', 'Z']),
+      makeQuestion(5, 'Q5', ['A', 'B'], 0),
+      makeQuestion(10, 'Q10', ['X', 'Y', 'Z'], 1),
     )
     const shuffled = shuffleExam(exam, alwaysSwapRng)
     const key = generateAnswerKey(shuffled)
-    expect(key.map(r => r.questionNumber)).toEqual([5, 10])
+    expect(key.map(r => r.questionNumber)).toEqual([1, 2])
   })
 
   it('question with zero options is excluded from answer key', () => {
     const exam = makeExam(
-      makeQuestion(1, 'Q1', []),
-      makeQuestion(2, 'Q2', ['CORRECT', 'B']),
+      makeQuestion(1, 'Q1', [], 0),
+      makeQuestion(2, 'Q2', ['CORRECT', 'B'], 1),
     )
     const shuffled = shuffleExam(exam)
     const key = generateAnswerKey(shuffled)
     expect(key).toHaveLength(1)
-    expect(key[0].questionNumber).toBe(2)
+    expect(key[0].questionNumber).toBe(2)  // outputQuestionNumber = seqIdx+1 = 1+1 = 2
   })
 
   it('complete answer key row structure for a deterministic shuffle', () => {
@@ -484,5 +499,15 @@ describe('generateAnswerKey', () => {
     for (const row of key) {
       expect(row.originalCorrectIndex).toBe(0)
     }
+  })
+
+  it('generateAnswerKey uses outputQuestionNumber not source number', () => {
+    // Source number 70 (simulating a spurious "question 70" from a decimal .70),
+    // but sequenceIndex is 2 → outputQuestionNumber = 3
+    const q = makeQuestion(70, 'Q', ['CORRECT', 'B', 'C'], 2)
+    const shuffled = shuffleExam(makeExam(q), alwaysSwapRng)
+    const [row] = generateAnswerKey(shuffled)
+    expect(row.questionNumber).toBe(3)       // outputQuestionNumber = seqIdx+1 = 2+1 = 3
+    expect(row.questionNumber).not.toBe(70)  // NOT the spurious source number
   })
 })

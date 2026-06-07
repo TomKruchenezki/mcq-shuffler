@@ -17,6 +17,7 @@ function makeQuestion(num: number, texts: string[]): ShuffledQuestion {
   return {
     number: num,
     questionText: `שאלה ${num}`,
+    outputQuestionNumber: num,
     options: texts.map((t, i) => makeOption(t, i)),
   }
 }

@@ -10,6 +10,7 @@ function makeShuffledExam(): ShuffledExam {
       {
         number: 1,
         questionText: 'שאלה לדוגמה',
+        outputQuestionNumber: 1,
         options: [
           { label: HEBREW_LABELS[0] as string, text: 'א', originalIndex: 0, isCorrectAnswer: true },
           { label: HEBREW_LABELS[1] as string, text: 'ב', originalIndex: 1, isCorrectAnswer: false },

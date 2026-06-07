@@ -460,3 +460,119 @@ describe('nonSequentialNumbers in diagnoseParsedExam', () => {
     expect(diagnoseParsedExam({ questions: [] }).nonSequentialNumbers).toEqual([])
   })
 })
+
+describe('outputQuestionNumber on ParsedQuestion', () => {
+  it('is 1 for the first question regardless of source number', () => {
+    const { questions } = parseExam('5. שאלה\nא. כן\nב. לא')
+    expect(questions[0].outputQuestionNumber).toBe(1)
+    expect(questions[0].number).toBe(5)
+  })
+
+  it('is sequential 1,2,3 even with duplicate source numbers', () => {
+    const { questions } = parseExam(
+      '3. שאלה\nא. כן\nב. לא\n3. שאלה\nא. כן\nב. לא\n3. שאלה\nא. כן\nב. לא',
+    )
+    expect(questions.map(q => q.outputQuestionNumber)).toEqual([1, 2, 3])
+  })
+
+  it('RE_RTL_PERIOD: ".70" (3-digit) does NOT create a spurious question', () => {
+    // ".70" is a 2-digit number — wait, 70 is 2 digits. Let's use ".123" for 3-digit.
+    // The regex restricts to \d{1,2} so ".123" should NOT fire.
+    const { questions } = parseExam('1. שאלה\nמהו ערך ה-accuracy?\n.123 הערה בתוך השאלה\nא. 95%\nב. 70%')
+    // ".123" (3 digits) must not create question 123
+    expect(questions).toHaveLength(1)
+    expect(questions[0].number).toBe(1)
+  })
+
+  it('RE_RTL_PERIOD: ".5" (1-digit) still creates question 5', () => {
+    const { questions } = parseExam('.5\nמהו הפלט?\nא. 0\nב. 1')
+    expect(questions).toHaveLength(1)
+    expect(questions[0].number).toBe(5)
+    expect(questions[0].outputQuestionNumber).toBe(1)
+  })
+
+  it('question number 0 is rejected — no question created', () => {
+    // ".0" should match RE_RTL_PERIOD but the guard "questionNumber <= 0" rejects it
+    const { questions } = parseExam('.0\nטקסט\nא. כן\nב. לא')
+    expect(questions).toHaveLength(0)
+  })
+})
+
+describe('QuestionStatus on ParsedQuestion', () => {
+  it('status is ok for a normal 4-option question', () => {
+    const { questions } = parseExam('1. שאלה?\nא. ראשון\nב. שני\nג. שלישי\nד. רביעי')
+    expect(questions[0].status).toBe('ok')
+  })
+
+  it('status is few-options when fewer than 2 options', () => {
+    const { questions } = parseExam('1. שאלה?\nא. יחיד')
+    expect(questions[0].status).toBe('few-options')
+  })
+
+  it('status is few-options for a question with zero options', () => {
+    const { questions } = parseExam('1. שאלה ללא תשובות')
+    expect(questions[0].status).toBe('few-options')
+  })
+
+  it('status is huge-block when questionText.length > 500 chars', () => {
+    const longText = 'א'.repeat(501)
+    const { questions } = parseExam(`1. ${longText}\nא. כן\nב. לא`)
+    expect(questions[0].status).toBe('huge-block')
+  })
+
+  it('status is visual-content when question text mentions "הגרף"', () => {
+    const { questions } = parseExam('1. בהתייחס להגרף הבא, מה נכון?\nא. עולה\nב. יורד')
+    expect(questions[0].status).toBe('visual-content')
+  })
+})
+
+describe('hasVisualContent on ParsedQuestion', () => {
+  it('is true when question text mentions "הגרף הבא"', () => {
+    const { questions } = parseExam('1. הגרף הבא מציג נתונים\nא. כן\nב. לא')
+    expect(questions[0].hasVisualContent).toBe(true)
+  })
+
+  it('is true when all 2+ options have blank/single-char text (≤ 1 char)', () => {
+    // Single Hebrew letter per option = label only, no real text = likely visual/image option
+    const { questions } = parseExam('1. שאלה\nא. א\nב. ב')
+    expect(questions[0].hasVisualContent).toBe(true)
+  })
+
+  it('is false for a normal text question with meaningful option text', () => {
+    const { questions } = parseExam('1. מהו 2+2?\nא. ארבע\nב. חמש')
+    expect(questions[0].hasVisualContent).toBe(false)
+  })
+
+  it('is false when options are short valid Hebrew words like כן/לא (2 chars each)', () => {
+    // "כן" and "לא" are 2 chars — not flagged as blank visual options
+    const { questions } = parseExam('1. מהו הפלט?\nא. כן\nב. לא')
+    expect(questions[0].hasVisualContent).toBe(false)
+  })
+})
+
+describe('diagnoseParsedExam — hasVisualContentCount and needsReviewCount', () => {
+  it('hasVisualContentCount is 0 for a normal exam', () => {
+    const { questions } = parseExam('1. שאלה?\nא. ראשון\nב. שני\nג. שלישי\nד. רביעי')
+    expect(diagnoseParsedExam({ questions }).hasVisualContentCount).toBe(0)
+  })
+
+  it('hasVisualContentCount counts visual-content questions', () => {
+    const text = [
+      '1. הגרף הבא מציג מה?\nא. עולה\nב. יורד',
+      '2. שאלה רגילה\nא. ראשון\nב. שני',
+    ].join('\n')
+    const { questions } = parseExam(text)
+    expect(diagnoseParsedExam({ questions }).hasVisualContentCount).toBe(1)
+  })
+
+  it('needsReviewCount is 0 when all questions have status ok', () => {
+    const { questions } = parseExam('1. שאלה?\nא. ראשון\nב. שני')
+    expect(diagnoseParsedExam({ questions }).needsReviewCount).toBe(0)
+  })
+
+  it('needsReviewCount counts non-ok questions', () => {
+    // Q1 has 1 option → few-options; Q2 is ok
+    const { questions } = parseExam('1. שאלה?\nא. בלבד\n2. שאלה?\nא. ראשון\nב. שני')
+    expect(diagnoseParsedExam({ questions }).needsReviewCount).toBe(1)
+  })
+})
