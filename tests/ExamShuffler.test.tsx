@@ -43,11 +43,13 @@ vi.mock('dexie-react-hooks', () => ({
 const SAMPLE = `1. שאלה\nא. ראשון\nב. שני\nג. שלישי\nד. רביעי`
 
 function makeVisualResult(): VisualExtractionResult {
+  // stemDataUrl must be ≥100 chars to pass validateVisualResult's quality gate
+  const validStemDataUrl = 'data:image/png;base64,' + 'A'.repeat(100)
   return {
     visualQuestions: [
       {
         number: 1,
-        stemDataUrl: 'data:,stem',
+        stemDataUrl: validStemDataUrl,
         options: [
           { originalIndex: 0, isOriginalCorrectAnswer: true, dataUrl: 'data:,optA', labelBox: { pdfRect: { x: 50, y: 100, width: 20, height: 12 }, labelChar: 'א' }, approximateText: 'א' },
           { originalIndex: 1, isOriginalCorrectAnswer: false, dataUrl: 'data:,optB', labelBox: { pdfRect: { x: 50, y: 80, width: 20, height: 12 }, labelChar: 'ב' }, approximateText: 'ב' },

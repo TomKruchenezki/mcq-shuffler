@@ -7,10 +7,10 @@ import type { PdfExtractionQuality } from '@/lib/extract/extractPdf'
 import type { VisualExtractionResult, ComplexityFlags } from '@/lib/extract/pdfEngine/visualTypes'
 
 const PDF_MODE_LABELS: Record<PdfMode, string> = {
-  auto: 'אוטומטי',
+  auto: 'אוטומטי (מומלץ)',
   fast: 'טקסט מהיר',
   ocr: 'OCR מקומי',
-  visual: 'נאמנות גבוהה',
+  visual: 'נאמנות גבוהה (ניסיוני)',
 }
 
 interface FileMeta {
@@ -180,8 +180,10 @@ export default function FileUpload({ onExtracted, onVisualExtracted }: Props) {
           ))}
         </div>
         <p className="mt-1 text-xs text-gray-400">
-          אוטומטי: מנסה טקסט, עובר ל-OCR בעת הצורך.
-          נאמנות גבוהה: שומר שאלות כתמונות — מומלץ לשאלות עם גרפים, טבלאות ותרשימים.
+          אוטומטי — מומלץ לרוב המבחנים, מנסה טקסט ועובר ל-OCR בעת הצורך.
+          טקסט מהיר — טוב ל-PDF טקסטואלי בלבד.
+          OCR מקומי — איטי, מתאים לסריקות.
+          נאמנות גבוהה — ניסיוני, מיועד לשאלות עם גרפים/טבלאות; ייתכן שידרוש תיקון ידני מקיף.
           כל העיבוד מתבצע מקומית בדפדפן.
         </p>
       </div>

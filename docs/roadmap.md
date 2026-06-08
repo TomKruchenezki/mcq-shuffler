@@ -22,6 +22,26 @@ This document describes the planned evolution of the MCQ shuffler beyond its cur
 
 ---
 
+## ✅ Step 9G — Acceptance Hardening & Manual Repair Workflow (COMPLETE)
+
+**Goal:** Gate visual mode output quality, surface all repair-needed issues in an issue navigator, and add a one-click "ignore source number" tool — making the full PDF → parse → review → export workflow reliable in practice.
+
+### Changes
+
+- **Part A — Visual mode failure gate:** New `lib/extract/validateVisualResult.ts` — rejects if 0 questions, majority have <2 options, or majority have empty/short stemDataUrl. `ExamShuffler.handleVisualExtracted()` now calls this gate; on rejection sets `visualFailureReason` state and shows an amber warning block with a Hebrew explanation and fallback instructions. Bad visual output is never stored.
+- **Part B — Mode selector labels:** `FileUpload.tsx` `PDF_MODE_LABELS` updated: `'אוטומטי (מומלץ)'` and `'נאמנות גבוהה (ניסיוני)'`; help text paragraph expanded with per-mode descriptions.
+- **Part C — Issue navigator:** New `lib/editor/issueGroups.ts` — `groupIssues()` pure function groups questions into: missing-visual, missing-answer, few-options, suspicious-source, needs-review. New `components/IssueNavigator.tsx` renders amber panel with per-group question number links and "jump to next issue" button. Rendered above the question list in `ManualExamEditor`.
+- **Part D — Ignore source number:** `ignoreSourceNumber(exam, id)` added to `lib/editor/editableExam.ts`. `ManualExamEditor` QuestionCard shows a ✕ button next to source number display (amber for suspicious-number status). Source number label also updated to show `(מקור חשוד: N)` in amber for suspicious status. `ExamShuffler.handleIgnoreSourceNumber()` wires state update and dirty flag.
+- **Part E — Expect.json path fix:** `scripts/diagnosePdfFixtures.ts` already used `path.dirname(filePath)` — confirmed correct for `manual-fixtures/pdf/` subdirectory.
+- **Part F — Acceptance summary in diagnostic report:** `buildAcceptanceSummary()` added to diagnostic script; appended to each per-PDF `report.md` with parsed question count, review %, missing visual, suspicious numbers, false markers, and a Hebrew workflow recommendation.
+- **Article id for scroll:** Each `QuestionCard` `<article>` now has `id={`question-${q.id}`}` for `IssueNavigator` scroll targeting.
+
+**Test count after step:** 561 passing (546 previous + 5 validateVisualResult + 6 issueGroups/allIssueQuestionIds + 3 ignoreSourceNumber + 1 updated FileUpload label), 0 failures, 0 TS errors.
+
+**Diagnostic output unchanged:** MoedA 0 false markers, MoedB 0 false markers; each report.md now includes Acceptance Summary section.
+
+---
+
 ## ✅ Step 9F — Real PDF Fixture Hardening (COMPLETE)
 
 **Goal:** Use real local MoedA/MoedB fixtures to harden PDF parsing, visual warnings, and diagnostics based on actual diagnostic output from Step 9E.

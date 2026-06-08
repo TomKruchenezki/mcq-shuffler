@@ -227,6 +227,42 @@ function checkExpectations(
   return lines
 }
 
+// ── Acceptance summary ────────────────────────────────────────────────────────
+
+function buildAcceptanceSummary(opts: {
+  questionsCount: number
+  needsReviewCount: number
+  missingVisualContentCount: number
+  suspiciousNumberCount: number
+  falseMarkersCount: number
+}): string {
+  const { questionsCount, needsReviewCount, missingVisualContentCount, suspiciousNumberCount, falseMarkersCount } = opts
+  const pct = questionsCount > 0 ? Math.round((needsReviewCount / questionsCount) * 100) : 0
+
+  let recommendation: string
+  if (questionsCount === 0) {
+    recommendation = 'PDF לא קריא — נסה OCR מקומי'
+  } else if (pct === 0 && missingVisualContentCount === 0) {
+    recommendation = 'מצב אוטומטי בסדר — תיקון ידני מינימלי נדרש'
+  } else if (pct <= 25) {
+    recommendation = 'מצב אוטומטי + תיקון ידני (צרף צילומי מסך לשאלות עם גרפים)'
+  } else {
+    recommendation = 'תיקון ידני מקיף נדרש — שקול להשתמש ב-OCR'
+  }
+
+  let s = `## Acceptance Summary\n\n`
+  s += `| Metric | Value |\n`
+  s += `|--------|-------|\n`
+  s += `| Parsed questions | ${questionsCount} |\n`
+  s += `| Questions needing review | ${needsReviewCount} (${pct}%) |\n`
+  s += `| Missing visual/code | ${missingVisualContentCount} |\n`
+  s += `| Suspicious source numbers | ${suspiciousNumberCount} |\n`
+  s += `| False marker candidates | ${falseMarkersCount} |\n`
+  s += `| Recommended workflow | ${recommendation} |\n`
+  s += '\n'
+  return s
+}
+
 // ── Report generation ─────────────────────────────────────────────────────────
 
 function buildReport(opts: {
@@ -327,6 +363,14 @@ function buildReport(opts: {
     }
     r += '\n'
   }
+
+  r += buildAcceptanceSummary({
+    questionsCount: diag.parsedQuestionCount,
+    needsReviewCount: diag.needsReviewCount,
+    missingVisualContentCount: diag.missingVisualContentCount,
+    suspiciousNumberCount: diag.suspiciousNumberCount,
+    falseMarkersCount: falseMarkers.length,
+  })
 
   return r
 }

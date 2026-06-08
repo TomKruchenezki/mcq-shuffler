@@ -8,9 +8,10 @@ import type { ParsedExam, ParsedQuestion } from '@/lib/parser/parseQuestions'
 import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
 import type { VisualQuestion, ShuffledVisualExam } from '@/lib/extract/pdfEngine/visualTypes'
 import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes'
-import { parsedToEditable, editableToParsed } from '@/lib/editor/editableExam'
+import { parsedToEditable, editableToParsed, ignoreSourceNumber } from '@/lib/editor/editableExam'
 import { validateEditableExam } from '@/lib/editor/validateEditableExam'
 import type { EditableExam } from '@/lib/editor/editableExam'
+import { validateVisualResult } from '@/lib/extract/validateVisualResult'
 import { saveExam, updateExam, deriveStatus } from '@/lib/storage/examStore'
 import type { StoredExam, ExamSourceType } from '@/lib/storage/types'
 import { migrateLocalStorageDraft } from '@/lib/storage/migrateDraft'
@@ -62,6 +63,7 @@ export default function ExamShuffler() {
   // ── Visual pipeline state ──────────────────────────────────────────────────
   const [visualQuestions, setVisualQuestions] = useState<VisualQuestion[] | null>(null)
   const [shuffledVisualExam, setShuffledVisualExam] = useState<ShuffledVisualExam | null>(null)
+  const [visualFailureReason, setVisualFailureReason] = useState<string | null>(null)
 
   // ── Library / save state ───────────────────────────────────────────────────
   const [currentExamId, setCurrentExamId] = useState<string | null>(null)
@@ -195,10 +197,23 @@ export default function ExamShuffler() {
   // ── Visual extraction ─────────────────────────────────────────────────────
 
   function handleVisualExtracted(r: VisualExtractionResult) {
+    const { ok, reason } = validateVisualResult(r.visualQuestions)
+    if (!ok) {
+      setVisualFailureReason(reason ?? 'תוצאת חילוץ לא תקינה')
+      return  // do NOT store bad questions
+    }
+    setVisualFailureReason(null)
     setVisualQuestions(r.visualQuestions)
     setShuffledVisualExam(null)
     setAnswerKey(null)
-    setSourceType('pdf')  // high-fidelity mode is always PDF
+    setSourceType('pdf')
+  }
+
+  // ── Ignore source number ──────────────────────────────────────────────────
+
+  function handleIgnoreSourceNumber(questionId: string) {
+    setEditableExam(prev => prev ? ignoreSourceNumber(prev, questionId) : prev)
+    setIsDirty(true)
   }
 
   // ── Library CRUD ──────────────────────────────────────────────────────────
@@ -328,6 +343,31 @@ export default function ExamShuffler() {
         onVisualExtracted={handleVisualExtracted}
       />
 
+      {/* Visual mode failure warning */}
+      {visualFailureReason !== null && (
+        <div
+          role="alert"
+          dir="rtl"
+          className="mb-4 bg-amber-50 border border-amber-300 rounded-xl p-4 space-y-3"
+        >
+          <p className="text-amber-800 font-semibold text-sm">
+            ⚠ מצב נאמנות גבוהה לא הצליח לזהות שאלות בצורה אמינה
+          </p>
+          <p className="text-amber-700 text-sm">{visualFailureReason}</p>
+          <p className="text-amber-700 text-sm">
+            מומלץ לבחור מצב <strong>אוטומטי (מומלץ)</strong> בלוח הטעינה ולהעלות שוב.
+            לאחר קריאה אוטומטית, ניתן לצרף צילומי מסך לשאלות עם גרפים/טבלאות.
+          </p>
+          <button
+            type="button"
+            onClick={() => setVisualFailureReason(null)}
+            className="text-sm underline text-amber-700 hover:text-amber-900"
+          >
+            סגור והמשך לעריכה ידנית ריקה
+          </button>
+        </div>
+      )}
+
       {/* Quick-fill demo button */}
       <div className="mb-3 text-start">
         <button
@@ -432,6 +472,7 @@ export default function ExamShuffler() {
         <ManualExamEditor
           exam={editableExam}
           onChange={handleExamChange}
+          onIgnoreSourceNumber={handleIgnoreSourceNumber}
         />
       )}
 

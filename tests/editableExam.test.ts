@@ -16,6 +16,7 @@ import {
   moveOption,
   splitQuestionAtCursor,
   mergeWithPrevious,
+  ignoreSourceNumber,
 } from '@/lib/editor/editableExam'
 import { validateEditableExam } from '@/lib/editor/validateEditableExam'
 
@@ -596,5 +597,47 @@ describe('parsedToEditable — hasMissingVisualContent status mapping', () => {
     }
     const editable = parsedToEditable(parsed)
     expect(editable.questions[0]!.reviewStatus).toBe('visual-content')
+  })
+})
+
+// ─── ignoreSourceNumber ───────────────────────────────────────────────────────
+
+describe('ignoreSourceNumber', () => {
+  it('sets sourceQuestionNumber to undefined', () => {
+    const exam = parsedToEditable(makeParsedExam([{ number: 99 }]))
+    const q = exam.questions[0]!
+    // Verify we have a question with a sourceQuestionNumber to start with
+    // (parsedToEditable sets sourceQuestionNumber when number !== outputQuestionNumber)
+    const examWithSource = {
+      questions: exam.questions.map((x, i) =>
+        i === 0 ? { ...x, sourceQuestionNumber: 99 } : x,
+      ),
+    }
+    const result = ignoreSourceNumber(examWithSource, q.id)
+    expect(result.questions[0]!.sourceQuestionNumber).toBeUndefined()
+  })
+
+  it('sets reviewStatus to "manually-edited"', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q = exam.questions[0]!
+    const examWithSource = {
+      questions: exam.questions.map((x, i) =>
+        i === 0 ? { ...x, sourceQuestionNumber: 5, reviewStatus: 'suspicious-number' as const } : x,
+      ),
+    }
+    const result = ignoreSourceNumber(examWithSource, q.id)
+    expect(result.questions[0]!.reviewStatus).toBe('manually-edited')
+  })
+
+  it('does not change outputQuestionNumber', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q = exam.questions[0]!
+    const examWithSource = {
+      questions: exam.questions.map((x, i) =>
+        i === 0 ? { ...x, sourceQuestionNumber: 7 } : x,
+      ),
+    }
+    const result = ignoreSourceNumber(examWithSource, q.id)
+    expect(result.questions[0]!.outputQuestionNumber).toBe(q.outputQuestionNumber)
   })
 })

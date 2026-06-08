@@ -347,6 +347,22 @@ export function mergeWithPrevious(
  * Set or clear the image attached to a specific option.
  * Pass `undefined` to remove the image.
  */
+/**
+ * Clear the source question number for a question, acknowledging that it is
+ * unreliable (e.g. suspicious-number or non-sequential). The output question
+ * number (1..N display numbering) is unaffected.
+ * Sets reviewStatus to 'manually-edited' so the card reflects user action.
+ */
+export function ignoreSourceNumber(
+  exam: EditableExam,
+  questionId: string,
+): EditableExam {
+  return updateQuestion(exam, questionId, {
+    sourceQuestionNumber: undefined,
+    reviewStatus: 'manually-edited',
+  })
+}
+
 export function updateOptionImage(
   exam: EditableExam,
   questionId: string,

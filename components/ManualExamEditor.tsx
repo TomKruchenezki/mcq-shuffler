@@ -21,7 +21,9 @@ import {
   resetOutputNumbers,
   splitQuestionAtCursor,
   mergeWithPrevious,
+  ignoreSourceNumber,
 } from '@/lib/editor/editableExam'
+import { IssueNavigator } from './IssueNavigator'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -91,9 +93,10 @@ function deleteDraftFromStorage(): void {
 interface Props {
   exam: EditableExam
   onChange: (exam: EditableExam) => void
+  onIgnoreSourceNumber?: (questionId: string) => void
 }
 
-export default function ManualExamEditor({ exam, onChange }: Props) {
+export default function ManualExamEditor({ exam, onChange, onIgnoreSourceNumber }: Props) {
   const [draftExists, setDraftExists] = useState(() => hasDraftInStorage())
   const [focusedQuestionId, setFocusedQuestionId] = useState<string | null>(null)
 
@@ -203,6 +206,9 @@ export default function ManualExamEditor({ exam, onChange }: Props) {
         )}
       </div>
 
+      {/* Issue navigator — shown above question list */}
+      <IssueNavigator questions={exam.questions} />
+
       {/* Question cards */}
       {exam.questions.map((q, qIdx) => (
         <QuestionCard
@@ -231,6 +237,13 @@ export default function ManualExamEditor({ exam, onChange }: Props) {
           onFocusCard={() => setFocusedQuestionId(q.id)}
           onSplit={(before, after) => onChange(splitQuestionAtCursor(exam, q.id, before, after))}
           onMerge={() => onChange(mergeWithPrevious(exam, q.id))}
+          onIgnoreSourceNumber={() => {
+            if (onIgnoreSourceNumber) {
+              onIgnoreSourceNumber(q.id)
+            } else {
+              onChange(ignoreSourceNumber(exam, q.id))
+            }
+          }}
         />
       ))}
 
@@ -265,6 +278,8 @@ interface QuestionCardProps {
   onSplit: (textBefore: string, textAfter: string) => void
   /** Merge this question into the preceding one (no-op on first question). */
   onMerge: () => void
+  /** Clear the source question number (for suspicious-number cards). */
+  onIgnoreSourceNumber: () => void
 }
 
 function QuestionCard({
@@ -284,6 +299,7 @@ function QuestionCard({
   onFocusCard,
   onSplit,
   onMerge,
+  onIgnoreSourceNumber,
 }: QuestionCardProps) {
   const [showNotes, setShowNotes] = useState(false)
   const qImgRef = useRef<HTMLInputElement>(null)
@@ -308,6 +324,7 @@ function QuestionCard({
 
   return (
     <article
+      id={`question-${q.id}`}
       className="bg-white rounded-xl border border-gray-200 p-5 space-y-3"
       onFocusCapture={onFocusCard}
     >
@@ -327,7 +344,22 @@ function QuestionCard({
         />
         {q.sourceQuestionNumber !== undefined &&
           q.sourceQuestionNumber !== q.outputQuestionNumber && (
-            <span className="text-xs text-gray-400">(מקור: {q.sourceQuestionNumber})</span>
+            <span className="inline-flex items-center gap-1">
+              <span className={`text-xs ${q.reviewStatus === 'suspicious-number' ? 'text-amber-500' : 'text-gray-400'}`}>
+                {q.reviewStatus === 'suspicious-number'
+                  ? `(מקור חשוד: ${q.sourceQuestionNumber})`
+                  : `(מקור: ${q.sourceQuestionNumber})`}
+              </span>
+              <button
+                type="button"
+                title="התעלם ממספר המקור"
+                aria-label="התעלם ממספר המקור"
+                onClick={onIgnoreSourceNumber}
+                className="text-xs text-gray-300 hover:text-red-500 transition-colors leading-none"
+              >
+                ✕
+              </button>
+            </span>
           )}
 
         {/* Status badge */}

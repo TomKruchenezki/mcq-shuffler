@@ -86,7 +86,7 @@ describe('FileUpload', () => {
 
   it('renders PDF mode selector with three options', () => {
     render(<FileUpload onExtracted={() => {}} />)
-    expect(screen.getByText('אוטומטי')).toBeInTheDocument()
+    expect(screen.getByText('אוטומטי (מומלץ)')).toBeInTheDocument()
     expect(screen.getByText('טקסט מהיר')).toBeInTheDocument()
     expect(screen.getByText('OCR מקומי')).toBeInTheDocument()
   })
@@ -99,10 +99,10 @@ describe('FileUpload', () => {
 
   it('PDF mode selector shows 4 options including נאמנות גבוהה', () => {
     render(<FileUpload onExtracted={() => {}} />)
-    expect(screen.getByText('אוטומטי')).toBeInTheDocument()
+    expect(screen.getByText('אוטומטי (מומלץ)')).toBeInTheDocument()
     expect(screen.getByText('טקסט מהיר')).toBeInTheDocument()
     expect(screen.getByText('OCR מקומי')).toBeInTheDocument()
-    expect(screen.getByText('נאמנות גבוהה')).toBeInTheDocument()
+    expect(screen.getByText('נאמנות גבוהה (ניסיוני)')).toBeInTheDocument()
   })
 
   it('calls onExtracted with text extracted from a PDF file', async () => {
