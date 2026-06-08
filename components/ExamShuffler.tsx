@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { parseExam } from '@/lib/parser/parseQuestions'
+import { parseExam, diagnoseParsedExam } from '@/lib/parser/parseQuestions'
 import { shuffleExam, generateAnswerKey } from '@/lib/shuffle/shuffleExam'
 import { shuffleVisualExam, generateVisualAnswerKey } from '@/lib/shuffle/shuffleVisualExam'
 import type { ParsedExam, ParsedQuestion } from '@/lib/parser/parseQuestions'
@@ -97,6 +97,33 @@ export default function ExamShuffler() {
   function handleExamChange(exam: EditableExam) {
     setEditableExam(exam)
     setIsDirty(true)
+  }
+
+  // ── Debug diagnostics download ────────────────────────────────────────────
+
+  function downloadDiagnosticsReport(exam: ParsedExam) {
+    const diag = diagnoseParsedExam(exam)
+    const report = {
+      diagnostics: diag,
+      questions: exam.questions.map(q => ({
+        outputNumber: q.outputQuestionNumber,
+        sourceNumber: q.number,
+        status: q.status,
+        optionCount: q.options.length,
+        hasVisualContent: q.hasVisualContent,
+        hasMissingVisualContent: q.hasMissingVisualContent ?? false,
+        splitFromEmbedded: q.splitFromEmbedded ?? false,
+        questionText: q.questionText,
+        options: q.options.map(o => o.text),
+      })),
+    }
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'exam-diagnostics.json'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // ── Parse / reset ─────────────────────────────────────────────────────────
@@ -384,9 +411,20 @@ export default function ExamShuffler() {
 
       {/* Parsed preview (text mode only) */}
       {parsedExam !== null && (
-        <ParsedExamPreview
-          exam={{ questions: sortedForOrder(parsedExam) }}
-        />
+        <>
+          <ParsedExamPreview
+            exam={{ questions: sortedForOrder(parsedExam) }}
+          />
+          <div className="flex justify-end mt-1">
+            <button
+              type="button"
+              onClick={() => downloadDiagnosticsReport(parsedExam)}
+              className="text-xs text-gray-400 hover:text-gray-600 underline"
+            >
+              הורד דוח ניתוח (JSON)
+            </button>
+          </div>
+        </>
       )}
 
       {/* Manual exam editor — shown after parsing */}

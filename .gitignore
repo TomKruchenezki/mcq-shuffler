@@ -22,3 +22,8 @@ next-env.d.ts
 
 # local exam files for manual testing (never commit real exams)
 /manual-fixtures/
+
+# local diagnostics output (never commit)
+/.tmp/
+/diagnostics-output/
+/.local-diagnostics/

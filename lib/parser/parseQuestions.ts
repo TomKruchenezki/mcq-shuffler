@@ -53,8 +53,8 @@ const RE_PERIOD = /^(\d+)\.(?:\s+(.+)|\s*$)/
 // "N) text" or "N)" alone
 const RE_PAREN = /^(\d+)\)(?:\s+(.+)|\s*$)/
 // ".N" — RTL/PDF-flipped period-number, e.g. ".2" at start of line
-// Restricted to 1-2 digits to prevent matching ".70" (from decimal 0.70)
-const RE_RTL_PERIOD = /^\.(\d{1,2})\b/
+// Restricted to 1-2 digits; (?!\s*%) prevents ".70%" (decimal value) from matching as question 70
+const RE_RTL_PERIOD = /^\.(\d{1,2})\b(?!\s*%)/
 // Hebrew א–ת (full alphabet) or Latin A–Z, with . or ) delimiter
 const RE_OPTION = /^([א-ת]|[A-Z])[.)]\s*(.*)/
 
@@ -230,8 +230,9 @@ export function parseExam(rawText: string): ParsedExam {
     }
     } // end else (RE_REVERSED_FULL)
 
-    // Guard: a parsed number of 0 or negative is not a valid question number
-    if (questionNumber !== null && questionNumber <= 0) questionNumber = null
+    // Guard: a negative number is not a valid question number.
+    // 0 is allowed through — flushQuestion assigns it suspicious-number status.
+    if (questionNumber !== null && questionNumber < 0) questionNumber = null
 
     if (questionNumber !== null) {
       if (currentOption !== null && currentQuestion !== null) {

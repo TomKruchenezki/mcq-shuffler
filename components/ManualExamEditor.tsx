@@ -19,6 +19,8 @@ import {
   updateOptionText,
   moveOption,
   resetOutputNumbers,
+  splitQuestionAtCursor,
+  mergeWithPrevious,
 } from '@/lib/editor/editableExam'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -227,6 +229,8 @@ export default function ManualExamEditor({ exam, onChange }: Props) {
           onSetCorrect={optId => onChange(setCorrectOption(exam, q.id, optId))}
           onUpdateOptionText={(optId, text) => onChange(updateOptionText(exam, q.id, optId, text))}
           onFocusCard={() => setFocusedQuestionId(q.id)}
+          onSplit={(before, after) => onChange(splitQuestionAtCursor(exam, q.id, before, after))}
+          onMerge={() => onChange(mergeWithPrevious(exam, q.id))}
         />
       ))}
 
@@ -257,6 +261,10 @@ interface QuestionCardProps {
   onUpdateOptionText: (optId: string, text: string) => void
   /** Called when any child receives focus; used to track which card is active for paste. */
   onFocusCard: () => void
+  /** Split question text at a cursor position: textBefore stays, textAfter → new question. */
+  onSplit: (textBefore: string, textAfter: string) => void
+  /** Merge this question into the preceding one (no-op on first question). */
+  onMerge: () => void
 }
 
 function QuestionCard({
@@ -274,9 +282,12 @@ function QuestionCard({
   onSetCorrect,
   onUpdateOptionText,
   onFocusCard,
+  onSplit,
+  onMerge,
 }: QuestionCardProps) {
   const [showNotes, setShowNotes] = useState(false)
   const qImgRef = useRef<HTMLInputElement>(null)
+  const qTextRef = useRef<HTMLTextAreaElement>(null)
 
   const noCorrectAnswer =
     q.correctOptionId === null || !q.options.some(o => o.id === q.correctOptionId)
@@ -365,11 +376,33 @@ function QuestionCard({
             aria-label="מחק שאלה"
             className="px-2 py-1 text-xs rounded bg-red-50 hover:bg-red-100 text-red-600 transition-colors"
           >🗑</button>
+          <button
+            type="button"
+            onClick={() => {
+              const pos = qTextRef.current?.selectionStart ?? q.text.length
+              const before = q.text.slice(0, pos)
+              const after = q.text.slice(pos)
+              if (after.trim()) onSplit(before, after)
+            }}
+            title="פצל לשאלה חדשה מנקודת הסמן"
+            aria-label="פצל שאלה"
+            className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition-colors"
+          >✂</button>
+          {qIdx > 0 && (
+            <button
+              type="button"
+              onClick={onMerge}
+              title="אחד עם השאלה שלפניה"
+              aria-label="אחד שאלה עם הקודמת"
+              className="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-gray-200 transition-colors"
+            >⊞</button>
+          )}
         </div>
       </div>
 
       {/* ── Question text ───────────────────────────────────────────────────── */}
       <textarea
+        ref={qTextRef}
         value={q.text}
         onChange={e => handleTextChange(e.target.value)}
         dir="auto"

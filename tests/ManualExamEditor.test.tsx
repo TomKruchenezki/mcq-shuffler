@@ -234,6 +234,20 @@ describe('ManualExamEditor', () => {
     expect(screen.getByText(/הוסף\/הדבק צילום מסך לשאלה/)).toBeInTheDocument()
   })
 
+  it('✂ split button is present on each question card', () => {
+    render(<ManualExamEditor exam={makeExam()} onChange={() => {}} />)
+    // One ✂ button per question
+    const splitButtons = screen.getAllByTitle(/פצל לשאלה חדשה/)
+    expect(splitButtons).toHaveLength(2)
+  })
+
+  it('⊞ merge button is absent on the first card and present on subsequent cards', () => {
+    render(<ManualExamEditor exam={makeExam()} onChange={() => {}} />)
+    // Only question 2 (qIdx=1) has the merge button
+    const mergeButtons = screen.getAllByTitle(/אחד עם השאלה/)
+    expect(mergeButtons).toHaveLength(1)
+  })
+
   it('after image attached to missing-visual-content card, alert disappears', () => {
     const exam = makeExam()
     const q = exam.questions[0]!

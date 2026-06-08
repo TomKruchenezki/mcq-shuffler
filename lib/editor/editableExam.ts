@@ -276,6 +276,74 @@ export function moveOption(
 }
 
 /**
+ * Split a question at a text cursor position into two questions.
+ * textBefore stays on the current question; textAfter becomes a new blank question
+ * inserted immediately after. Options remain with the current question.
+ * Both questions get reviewStatus 'manually-edited'.
+ */
+export function splitQuestionAtCursor(
+  exam: EditableExam,
+  questionId: string,
+  textBefore: string,
+  textAfter: string,
+): EditableExam {
+  const idx = exam.questions.findIndex(q => q.id === questionId)
+  if (idx === -1) return exam
+  const original = exam.questions[idx]!
+  const newQuestion: EditableQuestion = {
+    id: generateId(),
+    outputQuestionNumber: original.outputQuestionNumber + 1,
+    sequenceIndex: original.sequenceIndex,
+    text: textAfter.trim(),
+    options: [],
+    correctOptionId: null,
+    reviewStatus: 'manually-edited',
+    hasVisualContent: false,
+  }
+  const updated: EditableQuestion = {
+    ...original,
+    text: textBefore.trim(),
+    reviewStatus: 'manually-edited',
+  }
+  const questions = [
+    ...exam.questions.slice(0, idx),
+    updated,
+    newQuestion,
+    ...exam.questions.slice(idx + 1),
+  ]
+  return { questions: resetOutputNumbers(questions) }
+}
+
+/**
+ * Merge a question into the preceding one.
+ * Current text is appended (with newline) to previous text.
+ * Current options are appended to previous options.
+ * Current question is removed; previous gets reviewStatus 'manually-edited'.
+ * No-op if the question is the first one.
+ */
+export function mergeWithPrevious(
+  exam: EditableExam,
+  questionId: string,
+): EditableExam {
+  const idx = exam.questions.findIndex(q => q.id === questionId)
+  if (idx <= 0) return exam
+  const current = exam.questions[idx]!
+  const prev = exam.questions[idx - 1]!
+  const merged: EditableQuestion = {
+    ...prev,
+    text: prev.text ? `${prev.text}\n${current.text}` : current.text,
+    options: [...prev.options, ...current.options],
+    reviewStatus: 'manually-edited',
+  }
+  const questions = [
+    ...exam.questions.slice(0, idx - 1),
+    merged,
+    ...exam.questions.slice(idx + 1),
+  ]
+  return { questions: resetOutputNumbers(questions) }
+}
+
+/**
  * Set or clear the image attached to a specific option.
  * Pass `undefined` to remove the image.
  */

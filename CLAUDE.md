@@ -73,6 +73,12 @@ npm run dev          # dev server at localhost:3000
 npm test             # run Vitest once
 npm run typecheck    # tsc --noEmit (type check only)
 npm run build        # static export to out/
+
+# PDF fixture diagnostics (local-only, real PDFs in manual-fixtures/ — git-ignored)
+npm run check:fixtures                           # verify PDFs are not git-tracked
+npm run diagnose:pdf:all                         # analyze all manual-fixtures/*.pdf
+npm run diagnose:pdf -- manual-fixtures/X.pdf   # analyze one PDF
+# Output: .tmp/pdf-diagnostics/ (also git-ignored)
 ```
 
 ---

@@ -491,10 +491,13 @@ describe('outputQuestionNumber on ParsedQuestion', () => {
     expect(questions[0].outputQuestionNumber).toBe(1)
   })
 
-  it('question number 0 is rejected — no question created', () => {
-    // ".0" should match RE_RTL_PERIOD but the guard "questionNumber <= 0" rejects it
+  it('question number 0 creates a suspicious-number question (guard allows 0 through)', () => {
+    // ".0" matches RE_RTL_PERIOD; guard now only rejects negative numbers (<0),
+    // so number 0 is allowed through and gets suspicious-number status in flushQuestion.
     const { questions } = parseExam('.0\nטקסט\nא. כן\nב. לא')
-    expect(questions).toHaveLength(0)
+    expect(questions).toHaveLength(1)
+    expect(questions[0]!.number).toBe(0)
+    expect(questions[0]!.status).toBe('suspicious-number')
   })
 })
 
@@ -626,6 +629,25 @@ describe('percentage protection — שאלה מספר N%', () => {
     // The percentage immediately follows the number → should be rejected as question start
     const { questions } = parseExam('1. שאלה\nא. accuracy=שאלה מספר 70% precision\nב. לא')
     // Question text comes from Q1, not a spurious Q70
+    expect(questions).toHaveLength(1)
+    expect(questions[0]!.number).toBe(1)
+  })
+})
+
+describe('parseExam — question number 0 and decimal .N% guard', () => {
+  it('"שאלה מספר 0" on its own line creates a suspicious-number question', () => {
+    // Bug fix for Part A: the guard was previously "<=0" which dropped number 0,
+    // causing the question text to be absorbed into the previous option.
+    const { questions } = parseExam('שאלה מספר 0\nמה נכון?\nא. כן\nב. לא')
+    expect(questions).toHaveLength(1)
+    expect(questions[0]!.number).toBe(0)
+    expect(questions[0]!.status).toBe('suspicious-number')
+  })
+
+  it('".70%" line does not create question 70', () => {
+    // Bug fix for Part B: RE_RTL_PERIOD previously matched ".70" in ".70%",
+    // creating a spurious question 70 from decimal values like "Specificity = 70%".
+    const { questions } = parseExam('שאלה מספר 1\n.70%\nא. כן\nב. לא')
     expect(questions).toHaveLength(1)
     expect(questions[0]!.number).toBe(1)
   })

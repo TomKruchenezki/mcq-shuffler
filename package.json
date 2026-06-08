@@ -9,7 +9,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:fixtures": "node scripts/checkManualFixturesNotTracked.js",
+    "diagnose:pdf": "tsx scripts/diagnosePdfFixtures.ts",
+    "diagnose:pdf:all": "tsx scripts/diagnosePdfFixtures.ts manual-fixtures"
   },
   "dependencies": {
     "dexie": "^4.4.3",
@@ -37,6 +40,7 @@
     "jsdom": "^25.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.22.4",
     "typescript": "^5",
     "vitest": "^2.1.8"
   }

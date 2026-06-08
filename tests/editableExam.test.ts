@@ -14,6 +14,8 @@ import {
   deleteOption,
   updateOptionText,
   moveOption,
+  splitQuestionAtCursor,
+  mergeWithPrevious,
 } from '@/lib/editor/editableExam'
 import { validateEditableExam } from '@/lib/editor/validateEditableExam'
 
@@ -508,6 +510,62 @@ describe('validateEditableExam', () => {
 })
 
 // ─── hasMissingVisualContent → reviewStatus mapping ───────────────────────────
+
+describe('splitQuestionAtCursor', () => {
+  it('creates two questions: first has textBefore, second has textAfter', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q = exam.questions[0]!
+    const result = splitQuestionAtCursor(exam, q.id, 'שאלה ראשונה', 'שאלה שניה')
+    expect(result.questions).toHaveLength(3) // was 2, now 3
+    expect(result.questions[0]!.text).toBe('שאלה ראשונה')
+    expect(result.questions[1]!.text).toBe('שאלה שניה')
+    expect(result.questions[1]!.options).toHaveLength(0)
+  })
+
+  it('assigns reviewStatus manually-edited to both resulting questions', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q = exam.questions[0]!
+    const result = splitQuestionAtCursor(exam, q.id, 'before', 'after')
+    expect(result.questions[0]!.reviewStatus).toBe('manually-edited')
+    expect(result.questions[1]!.reviewStatus).toBe('manually-edited')
+  })
+
+  it('renumbers outputQuestionNumber sequentially after split', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q = exam.questions[0]!
+    const result = splitQuestionAtCursor(exam, q.id, 'before', 'after')
+    expect(result.questions.map(x => x.outputQuestionNumber)).toEqual([1, 2, 3])
+  })
+
+  it('returns unchanged exam when questionId not found', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const result = splitQuestionAtCursor(exam, 'nonexistent-id', 'a', 'b')
+    expect(result).toBe(exam)
+  })
+})
+
+describe('mergeWithPrevious', () => {
+  it('appends current text and options to previous, removes current, renumbers', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q2Id = exam.questions[1]!.id
+    const prevOptionCount = exam.questions[0]!.options.length
+    const currOptionCount = exam.questions[1]!.options.length
+    const result = mergeWithPrevious(exam, q2Id)
+    expect(result.questions).toHaveLength(1)
+    expect(result.questions[0]!.text).toContain('שאלה 1')
+    expect(result.questions[0]!.text).toContain('שאלה 2')
+    expect(result.questions[0]!.options).toHaveLength(prevOptionCount + currOptionCount)
+    expect(result.questions[0]!.reviewStatus).toBe('manually-edited')
+    expect(result.questions[0]!.outputQuestionNumber).toBe(1)
+  })
+
+  it('returns unchanged exam when called on the first question', () => {
+    const exam = parsedToEditable(makeParsedExam())
+    const q1Id = exam.questions[0]!.id
+    const result = mergeWithPrevious(exam, q1Id)
+    expect(result).toBe(exam)
+  })
+})
 
 describe('parsedToEditable — hasMissingVisualContent status mapping', () => {
   it('hasMissingVisualContent=true → reviewStatus "missing-visual-content"', () => {

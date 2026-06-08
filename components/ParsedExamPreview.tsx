@@ -121,8 +121,8 @@ export default function ParsedExamPreview({ exam }: Props) {
         </p>
       )}
       {diag.nonSequentialNumbers.length > 0 && (
-        <p className="text-amber-600 text-sm" role="alert">
-          ⚠ מספרי שאלות לא עולים בסדר — ייתכן שגיאת קריאה: שאלות {diag.nonSequentialNumbers.join(', ')}
+        <p className="text-gray-500 text-sm">
+          ℹ מספרי מקור לא עולים בסדר (מספור הפלט 1..N תקין): {diag.nonSequentialNumbers.join(', ')}
         </p>
       )}
 

@@ -22,6 +22,45 @@ This document describes the planned evolution of the MCQ shuffler beyond its cur
 
 ---
 
+## ✅ Step 9E — Local Real-PDF Fixture Diagnostics & Sanitized Regression Tests (COMPLETE)
+
+**Goal:** Build a local-only diagnostic workflow that analyzes real PDFs through the full extraction/parsing pipeline, generates structured reports, and turns recurring failure patterns into committed sanitized regression tests — without committing any real exam files or content.
+
+### Changes
+
+- **Part A — Git safety:** Added `.tmp/`, `diagnostics-output/`, `.local-diagnostics/` to `.gitignore`; created `scripts/checkManualFixturesNotTracked.js` + `npm run check:fixtures` script
+- **Part B — Diagnostic CLI:** Created `scripts/diagnosePdfFixtures.ts`; added `tsx@^4.22.4` devDependency; added `npm run diagnose:pdf` and `npm run diagnose:pdf:all` scripts. The script uses pdfjs-dist legacy Node.js build + `reconstructPageText` + `normalizePdfText` + `parseExam` + `diagnoseParsedExam`
+- **Parts C+D — Reports:** Per-PDF reports in `.tmp/pdf-diagnostics/<name>/` (extracted-text.txt, normalized-text.txt, parsed-questions.json, diagnostics.json, report.md); combined `.tmp/pdf-diagnostics/summary.md`; false marker candidate detection; missing visual content detection; RTL mixed-text examples
+- **Part E — Tests:** `tests/realPdfPatterns.test.ts` — 15 sanitized regression tests covering embedded markers, decimal false positives, formula/variable text, valid markers, PPV statistics snippets, missing visual patterns, Unicode safety; `tests/pdfFixtureDiagnostics.test.ts` — 5 local-only tests with `// @vitest-environment node` + `describe.skipIf(!fixturesExist)` guard (always skip in CI)
+- **Part F — Expectations:** Optional `.expect.json` files alongside PDFs in `manual-fixtures/` for advisory assertions in diagnostic reports
+- **Part G — Developer docs:** `docs/manual-fixtures.md` covering the full workflow
+
+**Test count after step:** 541 passing (521 previous + 15 sanitized + 5 fixture), 0 failures, 0 TS errors.
+**CI test count** (without fixtures): 536 passing (fixture tests auto-skip).
+
+**Diagnostic output on real exams:**
+- MoedA_2026.pdf: 14 pages, 25 questions, 150 options, 1 suspicious-number, 2 missing-visual-content
+- MoedB_2026.pdf: 12 pages, 24 questions, 150 options, 1 suspicious-number, 3 missing-visual-content
+
+---
+
+## ✅ Step 9D — Targeted Real-PDF Bugfixes & Manual Split/Merge Tools (COMPLETE)
+
+**Goal:** Fix two parser bugs exposed by MoedA_2026 QA, soften an alarming UX warning, add manual split/merge tools to the editor, and add a debug diagnostics download.
+
+### Changes
+
+- **Part A — Question number 0 guard fix:** Changed guard `questionNumber <= 0` → `< 0` in `parseQuestions.ts`, so `שאלה מספר 0` on its own line now correctly starts a new suspicious-number question instead of being silently absorbed into the previous option's text
+- **Part B — RE_RTL_PERIOD decimal guard:** Added `(?!\s*%)` lookahead to `RE_RTL_PERIOD`, preventing `.70%` (decimal Specificity value) from creating a spurious question 70
+- **Part C — Soften non-sequential warning:** Changed "⚠ מספרי שאלות לא עולים בסדר — ייתכן שגיאת קריאה" to neutral grey "ℹ מספרי מקור לא עולים בסדר (מספור הפלט 1..N תקין)" in `ParsedExamPreview.tsx`
+- **Part D — Manual split/merge tools:** Added `splitQuestionAtCursor()` and `mergeWithPrevious()` helpers to `editableExam.ts`; added ✂ (split at cursor) and ⊞ (merge with previous) buttons to each `QuestionCard` in `ManualExamEditor.tsx`; added `qTextRef` for cursor tracking
+- **Part G — Debug diagnostics download:** Added `downloadDiagnosticsReport()` to `ExamShuffler.tsx` + "הורד דוח ניתוח (JSON)" button after ParsedExamPreview
+- **10 new/updated tests:** parser (2 new + 1 updated existing) + editableExam (6 new) + ManualExamEditor (2 new)
+
+**Test count after step:** 521 passing, 0 failures, 0 TS errors.
+
+---
+
 ## ✅ Step 9C — Real PDF / Manual Editor Hardening (COMPLETE)
 
 **Goal:** Harden real PDF parsing, manual review warnings, RTL display, and image workflow based on MoedA_2026 QA testing.
