@@ -22,6 +22,27 @@ This document describes the planned evolution of the MCQ shuffler beyond its cur
 
 ---
 
+## ✅ Step 9F — Real PDF Fixture Hardening (COMPLETE)
+
+**Goal:** Use real local MoedA/MoedB fixtures to harden PDF parsing, visual warnings, and diagnostics based on actual diagnostic output from Step 9E.
+
+### Changes
+
+- **Part A — Path support:** `scripts/checkManualFixturesNotTracked.js` and `scripts/diagnosePdfFixtures.ts` now scan both `manual-fixtures/*.pdf` and `manual-fixtures/pdf/*.pdf`; `tests/pdfFixtureDiagnostics.test.ts` uses `findFixturePdf()` helper that checks both paths
+- **Part B — Normalization colon-format fix:** RE_FORWARD_SLASH and RE_PAGE_QUESTION in `pdfNormalize.ts` updated with `\s*:?\s*` before `\d+` — now correctly handles embedded "שאלה מספר :N" markers (colon-before-digit form) on the same line
+- **Part C — Missing visual keyword expansion:** Added `/שאילתת\s+SQL/i` and `/הנוסחה\s+הבאה/` to VISUAL_CONTENT_PATTERNS; added `/שאילתת\s+SQL/i` and `/DataFrame/i` to MISSING_VISUAL_KEYWORDS in `parseQuestions.ts`; updated `MISSING_VISUAL_KEYWORD_MAP` in diagnostic script to match
+- **Part D — Diagnostic false alarm fix:** `detectFalseMarkerCandidates` in `diagnosePdfFixtures.ts` now cross-references formula/percentage matches against a set of genuine "שאלה מספר N" marker numbers — eliminates false alarms (MoedA FalseMarkers: 2→0, MoedB: 1→0)
+- **Part E — ParsedExamPreview amber badge:** Source number badge now shows "(מקור חשוד: N)" in amber for `suspicious-number` questions vs. gray "(מקור: N)" for non-sequential source numbers
+- **Part F — 5 new sanitized tests (tests 16–20):** colon-format suspicious-number, colon-format valid question, SQL missing-visual, e=7 formula guard, non-sequential source → sequential output
+
+**Test count after step:** 546 passing (541 previous + 5 new), 0 failures, 0 TS errors.
+
+**Before/after diagnostic comparison:**
+- MoedA_2026.pdf: FalseMarkers 2→**0**, MissingVisual unchanged at 2
+- MoedB_2026.pdf: FalseMarkers 1→**0**, MissingVisual unchanged at 3
+
+---
+
 ## ✅ Step 9E — Local Real-PDF Fixture Diagnostics & Sanitized Regression Tests (COMPLETE)
 
 **Goal:** Build a local-only diagnostic workflow that analyzes real PDFs through the full extraction/parsing pipeline, generates structured reports, and turns recurring failure patterns into committed sanitized regression tests — without committing any real exam files or content.

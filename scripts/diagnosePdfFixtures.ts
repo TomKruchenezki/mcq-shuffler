@@ -108,6 +108,16 @@ function detectFalseMarkerCandidates(
   const questionNumbers = new Set(questions.map(q => q.number))
   const candidates: FalseMarkerCandidate[] = []
 
+  // Build set of numbers confirmed by a genuine "שאלה מספר N" marker in the text.
+  // If a number N also appears in a formula/percentage context, it is NOT a false alarm
+  // if there is an actual question marker for N — it's a coincidence.
+  const GENUINE_MARKER_RE = /שאלה\s+מספר\s*:?\s*(\d+)/g
+  const genuineNumbers = new Set<number>()
+  let gm: RegExpExecArray | null
+  while ((gm = GENUINE_MARKER_RE.exec(fullText)) !== null) {
+    genuineNumbers.add(parseInt(gm[1], 10))
+  }
+
   for (const { re, label } of FALSE_MARKER_PATTERNS) {
     re.lastIndex = 0
     let m: RegExpExecArray | null
@@ -116,6 +126,8 @@ function detectFalseMarkerCandidates(
       if (!capGroup) continue
       const num = parseInt(capGroup, 10)
       if (!questionNumbers.has(num)) continue
+      // Skip: this number is backed by a genuine "שאלה מספר N" marker → not a false alarm
+      if (genuineNumbers.has(num)) continue
       // Grab context around the match (truncated)
       const start = Math.max(0, m.index - 20)
       const end = Math.min(fullText.length, m.index + m[0].length + 20)
@@ -140,6 +152,8 @@ const MISSING_VISUAL_KEYWORD_MAP: Array<[RegExp, string]> = [
   [/השאילתה\s+הבא/, 'שאילתה'],
   [/הפלט\s+הבא/, 'הפלט הבא'],
   [/הרלציות\s+הבאות/, 'רלציות'],
+  [/שאילתת\s+SQL/i, 'שאילתת SQL'],
+  [/DataFrame/i, 'DataFrame'],
 ]
 
 function detectMissingVisualQuestions(questions: ParsedQuestion[]): MissingVisualEntry[] {
@@ -431,6 +445,23 @@ async function analyzePdf(
   }
 }
 
+/**
+ * Collect all PDF files in a directory, including the optional pdf/ subdirectory.
+ * Supports both `manual-fixtures/*.pdf` and `manual-fixtures/pdf/*.pdf`.
+ */
+function collectPdfFiles(dirArg: string): string[] {
+  const dirsToScan: string[] = []
+  if (fs.existsSync(dirArg)) dirsToScan.push(dirArg)
+  const subdir = path.join(dirArg, 'pdf')
+  if (fs.existsSync(subdir) && fs.statSync(subdir).isDirectory()) dirsToScan.push(subdir)
+
+  return dirsToScan.flatMap(dir =>
+    fs.readdirSync(dir)
+      .filter(f => f.toLowerCase().endsWith('.pdf'))
+      .map(f => path.join(dir, f))
+  )
+}
+
 async function main(): Promise<void> {
   const arg = process.argv[2]
   const OUTPUT_DIR = path.join(process.cwd(), '.tmp', 'pdf-diagnostics')
@@ -457,20 +488,17 @@ async function main(): Promise<void> {
     }
     pdfFiles = [arg]
   } else {
-    // Treat as directory
+    // Treat as directory — scan both the given dir and its pdf/ subdirectory
     if (!fs.existsSync(arg)) {
       console.log(`ℹ️  Directory not found: ${arg}`)
-      console.log('Put local PDFs under manual-fixtures/ and run: npm run diagnose:pdf:all')
+      console.log('Put local PDFs under manual-fixtures/ or manual-fixtures/pdf/ and run: npm run diagnose:pdf:all')
       process.exit(0)
     }
-    pdfFiles = fs
-      .readdirSync(arg)
-      .filter(f => f.toLowerCase().endsWith('.pdf'))
-      .map(f => path.join(arg, f))
+    pdfFiles = collectPdfFiles(arg)
 
     if (pdfFiles.length === 0) {
-      console.log(`ℹ️  No PDF files found in ${arg}`)
-      console.log('Put local PDFs under manual-fixtures/ and run: npm run diagnose:pdf:all')
+      console.log(`ℹ️  No PDF files found in ${arg} or ${arg}/pdf/`)
+      console.log('Put local PDFs under manual-fixtures/ or manual-fixtures/pdf/ and run: npm run diagnose:pdf:all')
       process.exit(0)
     }
   }

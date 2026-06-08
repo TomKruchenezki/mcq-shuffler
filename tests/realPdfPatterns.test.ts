@@ -344,4 +344,84 @@ describe('Real-PDF failure patterns — sanitized regression', () => {
     expect(fullText).toContain('SELECT')
   })
 
+  // ── 16. "שאלה מספר :0" colon format → suspicious-number ─────────────────────
+
+  it('16: "שאלה מספר :0" (colon format) is parsed as a suspicious-number question', () => {
+    // RE_HEBREW_FULL already handles ":?" before the digit.
+    // This test ensures the colon variant is recognized and flagged as suspicious (number = 0).
+    const rawText = ['שאלה מספר :0', 'שאלה חשודה', 'א. כן', 'ב. לא'].join('\n')
+    const exam = parseExam(rawText)
+    expect(exam.questions).toHaveLength(1)
+    expect(exam.questions[0]!.number).toBe(0)
+    expect(exam.questions[0]!.status).toBe('suspicious-number')
+  })
+
+  // ── 17. "שאלה מספר :29" colon format → valid question ───────────────────────
+
+  it('17: "שאלה מספר :29" (colon format) is correctly parsed as question 29', () => {
+    // Colon-before-digit format must still produce a valid (non-suspicious) question.
+    const rawText = ['שאלה מספר :29', 'שאלה תקינה', 'א. כן', 'ב. לא'].join('\n')
+    const exam = parseExam(rawText)
+    expect(exam.questions).toHaveLength(1)
+    expect(exam.questions[0]!.number).toBe(29)
+    expect(exam.questions[0]!.status).toBe('ok')
+  })
+
+  // ── 18. "שאילתת SQL הבאה" → hasMissingVisualContent: true ────────────────────
+
+  it('18: "שאילתת SQL הבאה" marks question as hasMissingVisualContent: true', () => {
+    // New VISUAL_CONTENT_PATTERNS entry /שאילתת\s+SQL/i should detect this.
+    // No inline SQL code follows → hasMissingVisualContent is true.
+    const rawText = [
+      'שאלה מספר 1',
+      'שאילתת SQL הבאה מחזירה תוצאות, מהי התוצאה?',
+      'א. תשובה א',
+      'ב. תשובה ב',
+      'ג. תשובה ג',
+      'ד. תשובה ד',
+    ].join('\n')
+    const exam = parseExam(rawText)
+    expect(exam.questions).toHaveLength(1)
+    expect(exam.questions[0]!.hasVisualContent).toBe(true)
+    expect(exam.questions[0]!.hasMissingVisualContent).toBe(true)
+  })
+
+  // ── 19. "e=7" in option text does not create question 7 ──────────────────────
+
+  it('19: "e=7" in option text does not create question 7', () => {
+    // Variables like e=7, e=11, e=13 start with a letter, not a digit,
+    // so they cannot match any question-start pattern.
+    const rawText = [
+      'שאלה מספר 1',
+      'מה ערך ה-e הנכון?',
+      'א. e=7',
+      'ב. e=11',
+      'ג. e=13',
+    ].join('\n')
+    const exam = parseExam(rawText)
+    expect(exam.questions).toHaveLength(1)
+    expect(exam.questions.some(q => q.number === 7)).toBe(false)
+    expect(exam.questions.some(q => q.number === 11)).toBe(false)
+    expect(exam.questions.some(q => q.number === 13)).toBe(false)
+  })
+
+  // ── 20. Non-sequential source numbers → output numbers always 1..N ───────────
+
+  it('20: non-sequential source numbers produce sequential output numbers 1..N', () => {
+    // Simulates the real-exam pattern where source numbers jump (e.g. 2,1,0,4) due to
+    // RTL PDF layout issues. outputQuestionNumber must always be 1..N regardless.
+    const rawText = [
+      'שאלה מספר 2', 'שאלה א', 'א. כן', 'ב. לא',
+      'שאלה מספר 1', 'שאלה ב', 'א. כן', 'ב. לא',
+      'שאלה מספר 0', 'שאלה ג', 'א. כן', 'ב. לא',
+      'שאלה מספר 4', 'שאלה ד', 'א. כן', 'ב. לא',
+    ].join('\n')
+    const exam = parseExam(rawText)
+    expect(exam.questions).toHaveLength(4)
+    expect(exam.questions.map(q => q.outputQuestionNumber)).toEqual([1, 2, 3, 4])
+    // Source number 0 is suspicious; source numbers 2, 1, 4 are ok
+    expect(exam.questions[2]!.status).toBe('suspicious-number')
+    expect(exam.questions[0]!.status).toBe('ok')
+  })
+
 })

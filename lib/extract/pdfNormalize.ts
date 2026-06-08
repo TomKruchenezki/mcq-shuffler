@@ -19,11 +19,13 @@ const RE_REVERSED_START = /^:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*(.*)/
 const RE_REVERSED_MID = /^(.+?)\s+:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*(.*)/
 
 // Forward question marker embedded after a slash: "ו. / שאלה מספר 5 text"
+// \s*:?\s* handles the colon-before-digit form "שאלה מספר :0"
 // \d+\b prevents backtracking to a partial digit (e.g. "7" from "70%") that would defeat the lookahead
-const RE_FORWARD_SLASH = /^(.*?\S)\s*\/\s*(שאלה\s+מספר\s+\d+\b(?!\s*%)\s*.*)$/
+const RE_FORWARD_SLASH = /^(.*?\S)\s*\/\s*(שאלה\s+מספר\s*:?\s*\d+\b(?!\s*%)\s*.*)$/
 
 // Page+question marker on same line: "עמוד 3 שאלה מספר 7 text"
-const RE_PAGE_QUESTION = /^עמוד\s+\d+\s+(שאלה\s+מספר\s+\d+\b(?!\s*%)\s*.*)$/
+// \s*:?\s* handles the colon-before-digit form "שאלה מספר :7"
+const RE_PAGE_QUESTION = /^עמוד\s+\d+\s+(שאלה\s+מספר\s*:?\s*\d+\b(?!\s*%)\s*.*)$/
 
 // Zero-width space marker (U+200B) — prepended to auto-split question lines
 // so the parser can detect and count them without threading counts through layers

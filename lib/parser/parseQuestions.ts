@@ -64,6 +64,8 @@ const VISUAL_CONTENT_PATTERNS: RegExp[] = [
   /ב(?:גרף|טבלה|דיאגרמה|תרשים)/,
   /הגרף\s+הבא/,
   /הטבלה\s+הבא/,
+  /שאילתת\s+SQL/i,   // SQL query reference ("שאילתת SQL הבאה")
+  /הנוסחה\s+הבאה/,  // inline formula reference
 ]
 
 // Phrases that strongly imply the visual/code content is NOT present in the extracted text
@@ -77,6 +79,8 @@ const MISSING_VISUAL_KEYWORDS: RegExp[] = [
   /השאילתה\s+הבא/,
   /הפלט\s+הבא/,
   /הרלציות\s+הבאות/,
+  /שאילתת\s+SQL/i,  // SQL queries
+  /DataFrame/i,      // Python DataFrame tables
 ]
 
 // Patterns indicating actual code/table/query content IS already in the text

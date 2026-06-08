@@ -26,9 +26,19 @@ import { parseExam, diagnoseParsedExam } from '@/lib/parser/parseQuestions'
 import type { ParsedExam, ParseDiagnostics } from '@/lib/parser/parseQuestions'
 
 // ── Fixture path ──────────────────────────────────────────────────────────────
+// Supports both manual-fixtures/<name>.pdf and manual-fixtures/pdf/<name>.pdf
 
-const FIXTURES = path.join(process.cwd(), 'manual-fixtures')
-const fixturesExist = fs.existsSync(FIXTURES)
+function findFixturePdf(name: string): string | null {
+  const candidates = [
+    path.join(process.cwd(), 'manual-fixtures', name),
+    path.join(process.cwd(), 'manual-fixtures', 'pdf', name),
+  ]
+  return candidates.find(p => fs.existsSync(p)) ?? null
+}
+
+const fixturesExist =
+  findFixturePdf('MoedA_2026.pdf') !== null ||
+  findFixturePdf('MoedB_2026.pdf') !== null
 
 // ── Shared extraction helper ──────────────────────────────────────────────────
 
@@ -73,8 +83,8 @@ describe.skipIf(!fixturesExist)(
       'MoedA_2026.pdf: extracts at least 20 parsed questions',
       { timeout: 30_000 },
       async () => {
-        const pdfPath = path.join(FIXTURES, 'MoedA_2026.pdf')
-        if (!fs.existsSync(pdfPath)) return  // file-level skip
+        const pdfPath = findFixturePdf('MoedA_2026.pdf') ?? ''
+        if (!pdfPath) return  // file-level skip (fixture may be absent)
 
         const { diag } = await extractAndParse(pdfPath)
         expect(diag.parsedQuestionCount).toBeGreaterThanOrEqual(20)
@@ -87,8 +97,8 @@ describe.skipIf(!fixturesExist)(
       'MoedB_2026.pdf: extracts at least 15 parsed questions',
       { timeout: 30_000 },
       async () => {
-        const pdfPath = path.join(FIXTURES, 'MoedB_2026.pdf')
-        if (!fs.existsSync(pdfPath)) return
+        const pdfPath = findFixturePdf('MoedB_2026.pdf') ?? ''
+        if (!pdfPath) return
 
         const { diag } = await extractAndParse(pdfPath)
         expect(diag.parsedQuestionCount).toBeGreaterThanOrEqual(15)
@@ -103,8 +113,8 @@ describe.skipIf(!fixturesExist)(
       'MoedA_2026.pdf: source numbers do not include known false markers [70, 95] for standard-length exams',
       { timeout: 30_000 },
       async () => {
-        const pdfPath = path.join(FIXTURES, 'MoedA_2026.pdf')
-        if (!fs.existsSync(pdfPath)) return
+        const pdfPath = findFixturePdf('MoedA_2026.pdf') ?? ''
+        if (!pdfPath) return
 
         const { exam, diag } = await extractAndParse(pdfPath)
         const sourceNumbers = exam.questions.map(q => q.number)
@@ -127,8 +137,8 @@ describe.skipIf(!fixturesExist)(
       'MoedA_2026.pdf: at least one question has status !== "ok" (real exams have edge cases)',
       { timeout: 30_000 },
       async () => {
-        const pdfPath = path.join(FIXTURES, 'MoedA_2026.pdf')
-        if (!fs.existsSync(pdfPath)) return
+        const pdfPath = findFixturePdf('MoedA_2026.pdf') ?? ''
+        if (!pdfPath) return
 
         const { diag } = await extractAndParse(pdfPath)
         // Real Hebrew university exams reliably have visual content questions
@@ -143,8 +153,8 @@ describe.skipIf(!fixturesExist)(
       'MoedB_2026.pdf: parsed option count >= 4 × parsed question count',
       { timeout: 30_000 },
       async () => {
-        const pdfPath = path.join(FIXTURES, 'MoedB_2026.pdf')
-        if (!fs.existsSync(pdfPath)) return
+        const pdfPath = findFixturePdf('MoedB_2026.pdf') ?? ''
+        if (!pdfPath) return
 
         const { exam, diag } = await extractAndParse(pdfPath)
         const totalOptions = exam.questions.reduce(

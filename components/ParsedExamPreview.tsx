@@ -143,7 +143,15 @@ export default function ParsedExamPreview({ exam }: Props) {
             <strong className="text-blue-600 ml-2">
               שאלה {q.outputQuestionNumber}:
               {q.number !== q.outputQuestionNumber && (
-                <span className="text-xs text-gray-400 font-normal mr-1"> (מקור: {q.number})</span>
+                <span
+                  className={`text-xs font-normal mr-1 ${
+                    q.status === 'suspicious-number' ? 'text-amber-500' : 'text-gray-400'
+                  }`}
+                >
+                  {q.status === 'suspicious-number'
+                    ? ` (מקור חשוד: ${q.number})`
+                    : ` (מקור: ${q.number})`}
+                </span>
               )}
             </strong>
             {q.status !== 'ok' && (
