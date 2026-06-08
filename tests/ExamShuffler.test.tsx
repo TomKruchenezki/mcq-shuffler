@@ -3,8 +3,13 @@ import { render, screen, fireEvent, act } from '@testing-library/react'
 import ExamShuffler from '@/components/ExamShuffler'
 import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes'
 
-const { capturedProps } = vi.hoisted(() => ({
+const { capturedProps, mockSaveExam, mockUpdateExam, mockDeriveStatus, mockUseLiveQuery, mockMigrateDraft } = vi.hoisted(() => ({
   capturedProps: { current: null as { onVisualExtracted?: (r: VisualExtractionResult) => void } | null },
+  mockSaveExam: vi.fn(),
+  mockUpdateExam: vi.fn(),
+  mockDeriveStatus: vi.fn(),
+  mockUseLiveQuery: vi.fn(),
+  mockMigrateDraft: vi.fn(),
 }))
 
 vi.mock('@/components/FileUpload', () => ({
@@ -12,6 +17,27 @@ vi.mock('@/components/FileUpload', () => ({
     capturedProps.current = props
     return <div data-testid="mock-file-upload" />
   },
+}))
+
+vi.mock('@/lib/storage/examStore', () => ({
+  saveExam: mockSaveExam,
+  updateExam: mockUpdateExam,
+  deriveStatus: mockDeriveStatus,
+  loadExam: vi.fn(),
+  listExams: vi.fn(),
+  deleteExam: vi.fn(),
+  renameExam: vi.fn(),
+  duplicateExam: vi.fn(),
+  saveShuffledExam: vi.fn(),
+  autoTitle: vi.fn(),
+}))
+
+vi.mock('@/lib/storage/migrateDraft', () => ({
+  migrateLocalStorageDraft: mockMigrateDraft,
+}))
+
+vi.mock('dexie-react-hooks', () => ({
+  useLiveQuery: mockUseLiveQuery,
 }))
 
 const SAMPLE = `1. שאלה\nא. ראשון\nב. שני\nג. שלישי\nד. רביעי`
@@ -41,6 +67,19 @@ function getTextarea(): HTMLTextAreaElement {
 describe('ExamShuffler', () => {
   beforeEach(() => {
     capturedProps.current = null
+    mockSaveExam.mockResolvedValue({
+      id: 'saved-id',
+      title: 'מבחן 1',
+      createdAt: 1000,
+      updatedAt: 1000,
+      sourceType: 'paste',
+      status: 'parsed',
+      editableExam: { questions: [] },
+    })
+    mockUpdateExam.mockResolvedValue(undefined)
+    mockDeriveStatus.mockReturnValue('shuffled')
+    mockUseLiveQuery.mockReturnValue([])
+    mockMigrateDraft.mockResolvedValue(undefined)
   })
 
   it('renders Hebrew title', () => {
@@ -174,5 +213,68 @@ describe('ExamShuffler', () => {
     fireEvent.click(screen.getByRole('button', { name: 'טען דוגמה' }))
     expect(getTextarea().value.length).toBeGreaterThan(0)
     expect(getTextarea().value).toContain('getUserName')
+  })
+
+  it('shows confirm dialog before loading over a dirty exam', () => {
+    // Return one exam from the library so the פתח button appears
+    mockUseLiveQuery.mockReturnValue([{
+      id: 'e1',
+      title: 'מבחן קיים',
+      status: 'parsed' as const,
+      sourceType: 'paste' as const,
+      questionCount: 1,
+      createdAt: 1000,
+      updatedAt: 1000,
+      editableExam: { questions: [] },
+    }])
+
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    render(<ExamShuffler />)
+
+    // Parse sample text so editableExam loads and ManualExamEditor appears
+    fireEvent.change(screen.getByLabelText('הדבק כאן את המבחן'), { target: { value: SAMPLE } })
+    fireEvent.click(screen.getByRole('button', { name: 'נתח מבחן' }))
+
+    // Edit a question in the ManualExamEditor → isDirty becomes true
+    const qTextarea = screen.getByRole('textbox', { name: 'טקסט שאלה 1' })
+    fireEvent.change(qTextarea, { target: { value: 'שינוי' } })
+
+    // Open library panel
+    fireEvent.click(screen.getByRole('button', { name: /פתח מבחנים שמורים/ }))
+
+    // Click "פתח" on the exam row — should trigger confirm because isDirty=true
+    fireEvent.click(screen.getByRole('button', { name: 'פתח' }))
+
+    expect(confirmSpy).toHaveBeenCalledOnce()
+    confirmSpy.mockRestore()
+  })
+
+  it('auto-save on shuffle calls updateExam with the current editableExam', async () => {
+    render(<ExamShuffler />)
+
+    // Parse sample text so editableExam is loaded
+    fireEvent.change(screen.getByLabelText('הדבק כאן את המבחן'), { target: { value: SAMPLE } })
+    fireEvent.click(screen.getByRole('button', { name: 'נתח מבחן' }))
+
+    // Click "שמור מבחן" → saveExam mock resolves → currentExamId = 'saved-id'
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'שמור מבחן' }))
+    })
+    expect(mockSaveExam).toHaveBeenCalledOnce()
+
+    // Edit a question so the exam is dirty
+    const qTextarea = screen.getByRole('textbox', { name: 'טקסט שאלה 1' })
+    fireEvent.change(qTextarea, { target: { value: 'שינוי' } })
+
+    // Shuffle → handleShuffle is async; updateExam should be called with editableExam
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'ערבב תשובות' }))
+    })
+
+    expect(mockUpdateExam).toHaveBeenCalledWith(
+      'saved-id',
+      expect.objectContaining({ editableExam: expect.any(Object) }),
+    )
   })
 })

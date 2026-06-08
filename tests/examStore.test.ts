@@ -13,6 +13,16 @@ import {
   autoTitle,
 } from '@/lib/storage/examStore'
 import type { EditableExam } from '@/lib/editor/editableExam'
+import {
+  parsedToEditable,
+  editableToParsed,
+  setCorrectOption,
+  updateQuestion,
+  addQuestion,
+  deleteQuestion,
+} from '@/lib/editor/editableExam'
+import { shuffleExam, generateAnswerKey } from '@/lib/shuffle/shuffleExam'
+import type { ParsedExam } from '@/lib/parser/parseQuestions'
 import type { ShuffledExam, AnswerKeyRow } from '@/lib/shuffle/shuffleExam'
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -255,5 +265,124 @@ describe('autoTitle', () => {
 
   it('returns fallback label for empty exam', () => {
     expect(autoTitle({ questions: [] })).toBe('מבחן ללא שם')
+  })
+})
+
+// ─── Workflow integration ─────────────────────────────────────────────────────
+
+function makeParsedExam(): ParsedExam {
+  return {
+    questions: [{
+      number: 1,
+      sequenceIndex: 0,
+      outputQuestionNumber: 1,
+      questionText: 'שאלה ראשונה',
+      options: [
+        { originalLabel: 'א', text: 'תשובה א', originalIndex: 0, isOriginalCorrectAnswer: true },
+        { originalLabel: 'ב', text: 'תשובה ב', originalIndex: 1, isOriginalCorrectAnswer: false },
+        { originalLabel: 'ג', text: 'תשובה ג', originalIndex: 2, isOriginalCorrectAnswer: false },
+      ],
+      status: 'ok',
+      hasVisualContent: false,
+    }],
+  }
+}
+
+describe('workflow integration', () => {
+  it('edited question text survives save → updateExam → loadExam', async () => {
+    const editable = parsedToEditable(makeParsedExam())
+    const stored = await saveExam({ editableExam: editable })
+
+    // Simulate manual edit
+    const edited = updateQuestion(editable, editable.questions[0].id, {
+      text: 'שאלה ערוכה',
+      reviewStatus: 'manually-edited',
+    })
+    await updateExam(stored.id, { editableExam: edited })
+
+    const loaded = await loadExam(stored.id)
+    expect(loaded!.editableExam.questions[0].text).toBe('שאלה ערוכה')
+    expect(loaded!.editableExam.questions[0].reviewStatus).toBe('manually-edited')
+  })
+
+  it('manually-set correct answer (via setCorrectOption) survives save → updateExam → loadExam', async () => {
+    const editable = parsedToEditable(makeParsedExam())
+    const stored = await saveExam({ editableExam: editable })
+
+    // Switch correct answer from first option to second
+    const secondOptionId = editable.questions[0].options[1].id
+    const edited = setCorrectOption(editable, editable.questions[0].id, secondOptionId)
+    await updateExam(stored.id, { editableExam: edited })
+
+    const loaded = await loadExam(stored.id)
+    expect(loaded!.editableExam.questions[0].correctOptionId).toBe(secondOptionId)
+  })
+
+  it('added question is present after saveExam', async () => {
+    const editable = parsedToEditable(makeParsedExam())
+    const withExtra = addQuestion(editable)
+    const stored = await saveExam({ editableExam: withExtra })
+
+    const loaded = await loadExam(stored.id)
+    expect(loaded!.editableExam.questions).toHaveLength(2)
+  })
+
+  it('deleted question is absent after save → updateExam → loadExam', async () => {
+    const twoQ = makeEditableExam(2)
+    const stored = await saveExam({ editableExam: twoQ })
+
+    const firstId = twoQ.questions[0].id
+    const trimmed = deleteQuestion(twoQ, firstId)
+    await updateExam(stored.id, { editableExam: trimmed })
+
+    const loaded = await loadExam(stored.id)
+    expect(loaded!.editableExam.questions).toHaveLength(1)
+    expect(loaded!.editableExam.questions[0].id).not.toBe(firstId)
+  })
+
+  it('option image stays with correct option through save → load → editableToParsed → shuffleExam → generateAnswerKey', async () => {
+    const dataUrl = 'data:image/png;base64,TEST_IMG'
+    const editable = parsedToEditable(makeParsedExam())
+    // Attach an image to the first option and mark it correct
+    const imgOption = { ...editable.questions[0].options[0], visualImageDataUrl: dataUrl }
+    const editedExam: EditableExam = {
+      questions: [{
+        ...editable.questions[0],
+        options: [imgOption, ...editable.questions[0].options.slice(1)],
+        correctOptionId: imgOption.id,
+      }],
+    }
+    const stored = await saveExam({ editableExam: editedExam })
+
+    // Reload and run through the full pipeline
+    const loaded = await loadExam(stored.id)
+    const parsed = editableToParsed(loaded!.editableExam)
+    const shuffled = shuffleExam(parsed)
+    const key = generateAnswerKey(shuffled)
+
+    // The answer key should reference the correct option regardless of shuffle position
+    expect(key).toHaveLength(1)
+    // Option has a dataUrl but the text is 'תשובה א', so answer key uses the text
+    expect(key[0].correctAnswerText).toBe('תשובה א')
+    // The image should be present on the shuffled option that is the correct answer
+    const correctOpt = shuffled.questions[0].options.find(o => o.isCorrectAnswer)
+    expect(correctOpt?.visualImageDataUrl).toBe(dataUrl)
+  })
+
+  it('save/load preserves reviewStatus missing-visual-content and hasVisualContent=true', async () => {
+    const editable = parsedToEditable(makeParsedExam())
+    // Manually override the first question to simulate a missing-visual-content detection
+    const q = editable.questions[0]!
+    const examWithMVC = {
+      questions: editable.questions.map(eq =>
+        eq.id === q.id
+          ? { ...eq, reviewStatus: 'missing-visual-content' as const, hasVisualContent: true }
+          : eq,
+      ),
+    }
+    const stored = await saveExam({ editableExam: examWithMVC })
+    const loaded = await loadExam(stored.id)
+    expect(loaded!.editableExam.questions[0]!.reviewStatus).toBe('missing-visual-content')
+    expect(loaded!.editableExam.questions[0]!.hasVisualContent).toBe(true)
   })
 })

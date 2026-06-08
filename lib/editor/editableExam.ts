@@ -49,10 +49,15 @@ function generateId(): string {
 
 // ─── Status mapping ───────────────────────────────────────────────────────────
 
-function mapStatus(status: QuestionStatus, hasVisualContent: boolean): EditableReviewStatus {
+function mapStatus(
+  status: QuestionStatus,
+  hasVisualContent: boolean,
+  hasMissingVisualContent?: boolean,
+): EditableReviewStatus {
   if (status === 'suspicious-number') return 'suspicious-number'
   if (status === 'few-options') return 'missing-options'
   if (status === 'huge-block') return 'incomplete'
+  if (hasMissingVisualContent) return 'missing-visual-content'
   if (hasVisualContent) return 'visual-content'
   return 'ok'
 }
@@ -83,7 +88,7 @@ export function parsedToEditable(exam: ParsedExam): EditableExam {
           originalLabel: opt.originalLabel,
         })),
         correctOptionId: correctId,
-        reviewStatus: mapStatus(q.status, q.hasVisualContent),
+        reviewStatus: mapStatus(q.status, q.hasVisualContent, q.hasMissingVisualContent),
         hasVisualContent: q.hasVisualContent,
       }
     }),

@@ -218,4 +218,39 @@ describe('ManualExamEditor', () => {
     // Suppress unused variable warning
     void q
   })
+
+  it('missing-visual-content question shows orange alert with image button', () => {
+    const exam = makeExam()
+    const examWithMVC: EditableExam = {
+      questions: exam.questions.map((q, i) =>
+        i !== 0 ? q : { ...q, reviewStatus: 'missing-visual-content' as const },
+      ),
+    }
+    render(<ManualExamEditor exam={examWithMVC} onChange={() => {}} />)
+    // Orange alert should be present
+    expect(screen.getByRole('alert')).toBeInTheDocument()
+    expect(screen.getByText(/ייתכן שחסר תוכן חזותי\/קוד/)).toBeInTheDocument()
+    // The action button to add screenshot
+    expect(screen.getByText(/הוסף\/הדבק צילום מסך לשאלה/)).toBeInTheDocument()
+  })
+
+  it('after image attached to missing-visual-content card, alert disappears', () => {
+    const exam = makeExam()
+    const q = exam.questions[0]!
+    const examWithMVC: EditableExam = {
+      questions: exam.questions.map((eq, i) =>
+        i !== 0 ? eq : { ...eq, reviewStatus: 'missing-visual-content' as const },
+      ),
+    }
+    // Simulate the exam already having an image (as if the user already attached one)
+    const examWithImg: EditableExam = {
+      questions: examWithMVC.questions.map(eq =>
+        eq.id !== q.id ? eq : { ...eq, visualImageDataUrl: 'data:image/png;base64,new' },
+      ),
+    }
+    render(<ManualExamEditor exam={examWithImg} onChange={() => {}} />)
+    // The alert should NOT appear when a visualImageDataUrl is already set
+    expect(screen.queryByText(/ייתכן שחסר תוכן חזותי\/קוד/)).not.toBeInTheDocument()
+    expect(screen.getByAltText('תמונה לשאלה')).toBeInTheDocument()
+  })
 })

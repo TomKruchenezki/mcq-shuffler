@@ -11,7 +11,7 @@ import type { VisualExtractionResult } from '@/lib/extract/pdfEngine/visualTypes
 import { parsedToEditable, editableToParsed } from '@/lib/editor/editableExam'
 import { validateEditableExam } from '@/lib/editor/validateEditableExam'
 import type { EditableExam } from '@/lib/editor/editableExam'
-import { saveExam, updateExam, saveShuffledExam, deriveStatus } from '@/lib/storage/examStore'
+import { saveExam, updateExam, deriveStatus } from '@/lib/storage/examStore'
 import type { StoredExam, ExamSourceType } from '@/lib/storage/types'
 import { migrateLocalStorageDraft } from '@/lib/storage/migrateDraft'
 import ParsedExamPreview from './ParsedExamPreview'
@@ -131,7 +131,7 @@ export default function ExamShuffler() {
 
   // ── Shuffle ───────────────────────────────────────────────────────────────
 
-  function handleShuffle() {
+  async function handleShuffle() {
     // Visual pipeline takes priority when visual questions are loaded
     if (visualQuestions && visualQuestions.length > 0) {
       const shuffled = shuffleVisualExam(visualQuestions)
@@ -149,9 +149,19 @@ export default function ExamShuffler() {
     const key = generateAnswerKey(shuffled)
     setShuffledExam(shuffled)
     setAnswerKey(key)
-    // Auto-save the shuffled result when this exam is already in the library
-    if (currentExamId) {
-      saveShuffledExam(currentExamId, shuffled, key).catch(() => {})
+    // Auto-save: persist BOTH editableExam edits AND the shuffle result so nothing is lost
+    if (currentExamId && editableExam) {
+      try {
+        await updateExam(currentExamId, {
+          editableExam,
+          shuffledExam: shuffled,
+          answerKey: key,
+          status: deriveStatus(editableExam, true),
+        })
+        setIsDirty(false)
+      } catch {
+        // Non-fatal — user can still manually save
+      }
     }
   }
 
@@ -161,6 +171,7 @@ export default function ExamShuffler() {
     setVisualQuestions(r.visualQuestions)
     setShuffledVisualExam(null)
     setAnswerKey(null)
+    setSourceType('pdf')  // high-fidelity mode is always PDF
   }
 
   // ── Library CRUD ──────────────────────────────────────────────────────────

@@ -152,5 +152,7 @@ describe('PrintableExam', () => {
     const img = screen.getByAltText('תמונה לתשובה א')
     expect(img).toBeInTheDocument()
     expect(img).toHaveAttribute('src', 'data:image/png;base64,oimg')
+    // Image must be a block sibling below the text row — direct child of <li>, not inside the flex <div>
+    expect(img.parentElement?.tagName).toBe('LI')
   })
 })

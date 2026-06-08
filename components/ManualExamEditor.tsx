@@ -380,6 +380,31 @@ function QuestionCard({
         aria-label={`טקסט שאלה ${q.outputQuestionNumber}`}
       />
 
+      {/* ── Missing visual content alert ───────────────────────────────────── */}
+      {q.reviewStatus === 'missing-visual-content' && !q.visualImageDataUrl && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-orange-300 bg-orange-50 p-3"
+        >
+          <span className="text-xl flex-shrink-0" aria-hidden="true">📊</span>
+          <div className="flex-1 space-y-1.5">
+            <p className="text-sm font-semibold text-orange-800">
+              ייתכן שחסר תוכן חזותי/קוד — מומלץ להוסיף צילום מסך
+            </p>
+            <p className="text-xs text-orange-600">
+              ניתן להדביק צילום מסך עם Ctrl+V, או לבחור קובץ תמונה
+            </p>
+            <button
+              type="button"
+              onClick={() => qImgRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-md bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-700 transition-colors"
+            >
+              📎 הוסף/הדבק צילום מסך לשאלה
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Question image ──────────────────────────────────────────────────── */}
       {q.visualImageDataUrl ? (
         <div className="flex items-start gap-2">
@@ -404,6 +429,7 @@ function QuestionCard({
             type="file"
             accept="image/png,image/jpeg,image/webp"
             className="sr-only"
+            data-testid="question-img-input"
             onChange={handleQuestionImageSelect}
           />
           <button
@@ -413,6 +439,9 @@ function QuestionCard({
           >
             + הוסף תמונה לשאלה
           </button>
+          {(q.hasVisualContent || q.reviewStatus === 'visual-content') && (
+            <span className="text-xs text-gray-400 mr-1">ניתן גם להדביק עם Ctrl+V</span>
+          )}
         </>
       )}
 

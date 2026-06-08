@@ -22,6 +22,41 @@ This document describes the planned evolution of the MCQ shuffler beyond its cur
 
 ---
 
+## ✅ Step 9C — Real PDF / Manual Editor Hardening (COMPLETE)
+
+**Goal:** Harden real PDF parsing, manual review warnings, RTL display, and image workflow based on MoedA_2026 QA testing.
+
+### Changes
+
+- **Part A — Forward marker splitting:** `pdfNormalize.ts` now splits lines like `"ו. / שאלה מספר 5 text"` into two lines; ZWSP marker on auto-split question lines enables parser to count them; `splitFromEmbedded?: boolean` on `ParsedQuestion`
+- **Part B — Percentage protection + suspicious > 999:** parser rejects `"שאלה מספר 70%"` as a question start; `suspicious-number` status now also fires when `acc.number > 999`; `suspiciousNumberCount` added to `ParseDiagnostics`
+- **Part C — Missing visual content:** `hasMissingVisualContent` field on `ParsedQuestion`; `MISSING_VISUAL_KEYWORDS` + `INLINE_CODE_PATTERNS` arrays; `checkMissingVisualContent()`; `mapStatus()` updated to return `missing-visual-content` before `visual-content`; `missingVisualContentCount` + `autoSplitCount` in `ParseDiagnostics`
+- **Part D — ManualExamEditor alert:** orange `role="alert"` block for `missing-visual-content` questions with no image; `data-testid="question-img-input"` on hidden file input; Ctrl+V hint for `visual-content` questions
+- **Part E — AnswerKeyTable RTL:** `unicodeBidi: 'plaintext'` on answer text cell
+- **Part F — ParsedExamPreview chips:** converted to client component; 3 new interactive chips (suspicious count, missing-visual count, auto-split count) with expandable question-number lists; sort-by-source-number toggle
+- **19 new tests:** pdfNormalize (3) + parser (9) + editableExam (2) + examStore (1) + ManualExamEditor (2) + corrections to 2 test assertions
+
+**Test count after step:** 511 passing, 0 failures, 0 TS errors.
+
+---
+
+## ✅ Step 9B — Workflow QA Hardening (COMPLETE)
+
+**Goal:** Harden the complete upload → parse → edit → save → reload → shuffle → export pipeline before adding Practice Mode. No new features.
+
+### Changes
+
+- **Bug fix:** `handleShuffle` auto-save now persists `editableExam` (not just `shuffledExam + answerKey`) — manual edits can no longer be lost by a shuffle
+- **Bug fix:** `handleVisualExtracted` now sets `sourceType = 'pdf'` so visual-mode PDFs show the correct icon in the library
+- **Layout fix:** `PrintableExam.tsx` — option images moved from inline flex row to block element below text (correct in Print/PDF export)
+- **7 new tests:** examStore workflow integration (5) + ExamShuffler isDirty warning and auto-save (2)
+- **1 strengthened test:** PrintableExam option image now asserts DOM structure (direct `<li>` child)
+- **README:** Added Complete Workflow QA Checklist + Known Limitations table
+
+**Test count after step:** 492 passing, 0 failures, 0 TS errors.
+
+---
+
 ## ✅ Step 9 — Local Exam Library (COMPLETE)
 
 **Goal:** Save, browse, and manage multiple exams in the browser — no backend required.

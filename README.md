@@ -121,6 +121,30 @@ Run these checks before deploying or releasing.
 - [ ] No shuffled exam yet → all three export buttons are disabled
 - [ ] "נקה הכל" resets all state and clears preview
 
+### Complete workflow (library round-trip)
+- [ ] Upload a PDF → confirm questions are parsed
+- [ ] Edit one question text manually
+- [ ] Change the correct answer on one question
+- [ ] Add a screenshot to a question (🖼 button)
+- [ ] Add a screenshot to an answer option
+- [ ] Click **שמור מבחן** — confirm it appears in the library panel (▼ פתח מבחנים שמורים)
+- [ ] Reload the page (F5)
+- [ ] Open the library → click **פתח** on the saved exam
+- [ ] Confirm: edited text, correct answer, and images all survived reload
+- [ ] Click **ערבב תשובות** — confirm answer key reflects the manually-edited correct answer
+- [ ] Export **PDF** (Print) — confirm images appear below option text, not inline
+- [ ] Export **Word** — confirm image-only options show placeholder text
+- [ ] Export **CSV** — confirm correct answer column shows edited option text (or `[תשובה עם תמונה]`)
+
+## Known Limitations
+
+| Limitation | Workaround |
+|---|---|
+| **DOCX export — image attachments** | Word export shows `[תמונה — לא זמינה בייצוא Word]` for image-only options. Images appear only in the browser Print → PDF export. Use PDF (Print) for image-containing exams. |
+| **High-Fidelity PDF mode — library storage** | Exams extracted in High-Fidelity (visual) mode are not saved to the local library by the auto-save; use **שמור מבחן** before shuffling, or use Auto / OCR / Text mode if you need reliable library storage. |
+| **IndexedDB storage limits** | Browsers typically allow several hundred MB. Exams with many large images may approach this limit; the browser will show a storage error. |
+| **No cross-device sync** | The exam library is stored in IndexedDB on the current device and browser. Use the Word or CSV export to move exams between devices. |
+
 ## Troubleshooting
 
 **"לא זוהו שאלות" (no questions detected)**  

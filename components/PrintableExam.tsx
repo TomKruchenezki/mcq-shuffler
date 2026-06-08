@@ -27,19 +27,22 @@ export default function PrintableExam({ exam, title = 'מבחן מעורבב' }:
           )}
           <ol style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {q.options.map(opt => (
-              <li key={opt.originalIndex} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                <span style={{ flexShrink: 0, fontWeight: 'bold', minWidth: '1.5rem', textAlign: 'right' }}>
-                  {opt.label}.
-                </span>
-                <span style={{ unicodeBidi: 'plaintext', whiteSpace: 'pre-wrap' }}>
-                  {opt.text}
-                </span>
+              <li key={opt.originalIndex} style={{ marginBottom: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <span style={{ flexShrink: 0, fontWeight: 'bold', minWidth: '1.5rem', textAlign: 'right' }}>
+                    {opt.label}.
+                  </span>
+                  <span style={{ unicodeBidi: 'plaintext', whiteSpace: 'pre-wrap' }}>
+                    {opt.text}
+                  </span>
+                </div>
                 {opt.visualImageDataUrl && (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={opt.visualImageDataUrl}
                     alt={`תמונה לתשובה ${opt.label}`}
-                    style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+                    style={{ maxWidth: '100%', maxHeight: 200, height: 'auto', display: 'block',
+                             marginTop: '0.25rem', marginRight: '2rem' }}
                   />
                 )}
               </li>

@@ -28,6 +28,10 @@ export interface ParsedQuestion {
   options: ParsedOption[]
   status: QuestionStatus
   hasVisualContent: boolean    // detected from text keywords or blank options
+  /** True when question text references a visual element that wasn't extracted as text */
+  hasMissingVisualContent?: boolean
+  /** True when split from a mid-line embedded marker by normalization */
+  splitFromEmbedded?: boolean
   /** Manually attached image data URL (set by editableToParsed; never set by parseExam). */
   visualImageDataUrl?: string
 }
@@ -62,8 +66,36 @@ const VISUAL_CONTENT_PATTERNS: RegExp[] = [
   /הטבלה\s+הבא/,
 ]
 
+// Phrases that strongly imply the visual/code content is NOT present in the extracted text
+const MISSING_VISUAL_KEYWORDS: RegExp[] = [
+  /הגרף\s+הבא/,
+  /הדיאגרמה/,
+  /התרשים/,
+  /הטבלה\s+הבא/,
+  /נתון\s+קטע\s+הקוד\s+הבא/,
+  /הקוד\s+הבא/,
+  /השאילתה\s+הבא/,
+  /הפלט\s+הבא/,
+  /הרלציות\s+הבאות/,
+]
+
+// Patterns indicating actual code/table/query content IS already in the text
+const INLINE_CODE_PATTERNS: RegExp[] = [
+  /\bSELECT\b/i,
+  /\bFROM\b/i,
+  /\bWHERE\b/i,
+  /[{}];/,
+]
+
 function hasVisualKeywords(text: string): boolean {
   return VISUAL_CONTENT_PATTERNS.some(re => re.test(text))
+}
+
+function checkMissingVisualContent(questionText: string): boolean {
+  const hasMissingKeyword = MISSING_VISUAL_KEYWORDS.some(re => re.test(questionText))
+  if (!hasMissingKeyword) return false
+  const hasInlineContent = INLINE_CODE_PATTERNS.some(re => re.test(questionText))
+  return !hasInlineContent
 }
 
 interface AccOption {
@@ -87,6 +119,7 @@ interface AccQuestion {
   questionTextParts: string[]
   options: AccOption[]
   sequenceIndex: number  // captured when question opens = questions.length at that moment
+  splitFromEmbedded?: boolean
 }
 
 function flushOption(acc: AccOption): ParsedOption {
@@ -102,10 +135,13 @@ function flushQuestion(acc: AccQuestion): ParsedQuestion {
   const questionText = acc.questionTextParts.join(' ').trim()
   const options = acc.options.map(flushOption)
   const hasVisualContent = hasVisualKeywords(questionText) || optionsAreAllBlank(acc.options)
+  const hasMissingVisualContent = hasVisualContent
+    ? checkMissingVisualContent(questionText)
+    : false
   const outputQuestionNumber = acc.sequenceIndex + 1
 
   let status: QuestionStatus = 'ok'
-  if (acc.number === 0) status = 'suspicious-number'
+  if (acc.number === 0 || acc.number > 999) status = 'suspicious-number'
   else if (options.length < 2) status = 'few-options'
   else if (questionText.length > 500) status = 'huge-block'
   else if (hasVisualContent) status = 'visual-content'
@@ -118,6 +154,8 @@ function flushQuestion(acc: AccQuestion): ParsedQuestion {
     options,
     status,
     hasVisualContent,
+    hasMissingVisualContent: hasMissingVisualContent || undefined,
+    splitFromEmbedded: acc.splitFromEmbedded || undefined,
   }
 }
 
@@ -136,7 +174,14 @@ export function parseExam(rawText: string): ParsedExam {
   let currentQuestion: AccQuestion | null = null
   let currentOption: AccOption | null = null
 
-  for (const line of lines) {
+  // Zero-width space marker added by pdfNormalize for auto-split question lines
+  const ZWSP = '​'
+
+  for (const rawLine of lines) {
+    // Detect and strip ZWSP marker (set by splitForwardMarkersFromMidLine)
+    const splitFromEmbedded = rawLine.startsWith(ZWSP)
+    const line = splitFromEmbedded ? rawLine.slice(ZWSP.length) : rawLine
+
     // Check question-start patterns (RE_HEBREW_FULL before RE_HEBREW_SHORT)
     let questionNumber: number | null = null
     let questionInlineText: string | null = null
@@ -149,10 +194,14 @@ export function parseExam(rawText: string): ParsedExam {
     } else {
     const mHebFull = RE_HEBREW_FULL.exec(line)
     if (mHebFull) {
-      questionNumber = parseInt(mHebFull[1], 10)
-      // Strip leading colon/spaces to handle "שאלה מספר 2: text"
+      // Percentage protection: reject "שאלה מספר 70%" as a question start
       const rest = line.slice(mHebFull[0].length).replace(/^[:\s]+/, '').trim()
-      questionInlineText = rest || null
+      if (rest.startsWith('%')) {
+        // Not a question start — treat as continuation text
+      } else {
+        questionNumber = parseInt(mHebFull[1], 10)
+        questionInlineText = rest || null
+      }
     } else {
       const mHebShort = RE_HEBREW_SHORT.exec(line)
       if (mHebShort) {
@@ -197,6 +246,7 @@ export function parseExam(rawText: string): ParsedExam {
         questionTextParts: questionInlineText ? [questionInlineText] : [],
         options: [],
         sequenceIndex: questions.length,  // = how many questions flushed so far
+        splitFromEmbedded: splitFromEmbedded || undefined,
       }
       continue
     }
@@ -245,6 +295,9 @@ export interface ParseDiagnostics {
   nonSequentialNumbers: number[]  // question numbers where q.number < previous q.number (likely mis-read digit)
   hasVisualContentCount: number   // questions with visual-content status
   needsReviewCount: number        // questions with any non-ok status
+  suspiciousNumberCount: number   // questions with suspicious-number status
+  missingVisualContentCount: number // questions with hasMissingVisualContent=true
+  autoSplitCount: number          // questions split from embedded markers by normalization
 }
 
 export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
@@ -264,6 +317,9 @@ export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
 
   const hasVisualContentCount = exam.questions.filter(q => q.hasVisualContent).length
   const needsReviewCount = exam.questions.filter(q => q.status !== 'ok').length
+  const suspiciousNumberCount = exam.questions.filter(q => q.status === 'suspicious-number').length
+  const missingVisualContentCount = exam.questions.filter(q => q.hasMissingVisualContent).length
+  const autoSplitCount = exam.questions.filter(q => q.splitFromEmbedded).length
 
   return {
     parsedQuestionCount: exam.questions.length,
@@ -278,5 +334,8 @@ export function diagnoseParsedExam(exam: ParsedExam): ParseDiagnostics {
     nonSequentialNumbers: nonSequential,
     hasVisualContentCount,
     needsReviewCount,
+    suspiciousNumberCount,
+    missingVisualContentCount,
+    autoSplitCount,
   }
 }

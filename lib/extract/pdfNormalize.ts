@@ -18,6 +18,17 @@ const RE_REVERSED_START = /^:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*(.*)/
 // Reversed question marker MID-LINE (non-empty prefix before it)
 const RE_REVERSED_MID = /^(.+?)\s+:?\s*(\d+)(?::\s+|\s+)שאלה\s+מספר\s*(.*)/
 
+// Forward question marker embedded after a slash: "ו. / שאלה מספר 5 text"
+// \d+\b prevents backtracking to a partial digit (e.g. "7" from "70%") that would defeat the lookahead
+const RE_FORWARD_SLASH = /^(.*?\S)\s*\/\s*(שאלה\s+מספר\s+\d+\b(?!\s*%)\s*.*)$/
+
+// Page+question marker on same line: "עמוד 3 שאלה מספר 7 text"
+const RE_PAGE_QUESTION = /^עמוד\s+\d+\s+(שאלה\s+מספר\s+\d+\b(?!\s*%)\s*.*)$/
+
+// Zero-width space marker (U+200B) — prepended to auto-split question lines
+// so the parser can detect and count them without threading counts through layers
+const ZWSP = '​'
+
 // Hebrew↔digit boundary spacing
 const RE_HEB_DIGIT = /([א-ת])(\d)/g
 const RE_DIGIT_HEB = /(\d)([א-ת])/g
@@ -35,7 +46,10 @@ export function normalizePdfText(pages: string[]): string[] {
   const preProcessed: string[][] = pages.map(page =>
     page
       .split('\n')
-      .flatMap(line => splitAndNormalizeReversedMarkers(fixDigitHebrewSpacing(line)))
+      .flatMap(line =>
+        splitAndNormalizeReversedMarkers(fixDigitHebrewSpacing(line))
+          .flatMap(l => splitForwardMarkersFromMidLine(l))
+      )
   )
 
   // Phase 2: build map from pre-processed trimmed line → set of page indices
@@ -85,6 +99,32 @@ function splitAndNormalizeReversedMarkers(line: string): string[] {
     const suffix = mMid[3].replace(/^[:\s]+/, '').trim()
     const qLine = suffix ? `שאלה מספר ${num} ${suffix}` : `שאלה מספר ${num}`
     return prefix ? [prefix, qLine] : [qLine]
+  }
+
+  return [t || line]
+}
+
+/**
+ * Splits a line that has a forward question marker embedded after content.
+ * E.g. "ו. / שאלה מספר 5 text" → ["ו.", "​שאלה מספר 5 text"]
+ * The ZWSP prefix on the question line lets the parser detect and count auto-splits.
+ */
+function splitForwardMarkersFromMidLine(line: string): string[] {
+  const t = line.trim()
+
+  const mSlash = RE_FORWARD_SLASH.exec(t)
+  if (mSlash) {
+    const prefix = mSlash[1]!.trim()
+    const qLine = mSlash[2]!.trim()
+    // ZWSP only when a real prefix exists (i.e. a genuine split happened)
+    return prefix ? [prefix, ZWSP + qLine] : [qLine]
+  }
+
+  const mPage = RE_PAGE_QUESTION.exec(t)
+  if (mPage) {
+    const questionLine = mPage[1]!.trim()
+    const pagePrefix = t.slice(0, t.indexOf(questionLine)).trim()
+    return pagePrefix ? [pagePrefix, ZWSP + questionLine] : [ZWSP + questionLine]
   }
 
   return [t || line]

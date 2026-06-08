@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import type { ParsedExam, QuestionStatus } from '@/lib/parser/parseQuestions'
 import { diagnoseParsedExam } from '@/lib/parser/parseQuestions'
 
@@ -14,6 +17,9 @@ const STATUS_LABEL: Record<QuestionStatus, string> = {
 }
 
 export default function ParsedExamPreview({ exam }: Props) {
+  const [sortBySource, setSortBySource] = useState(false)
+  const [expandedChip, setExpandedChip] = useState<string | null>(null)
+
   const count = exam.questions.length
 
   if (count === 0) {
@@ -27,19 +33,74 @@ export default function ParsedExamPreview({ exam }: Props) {
   const diag = diagnoseParsedExam(exam)
   const okCount = exam.questions.filter(q => q.status === 'ok').length
 
+  const displayQuestions = sortBySource
+    ? [...exam.questions].sort((a, b) => a.number - b.number)
+    : exam.questions
+
+  const hasNonTrivialSourceNumbers = exam.questions.some(
+    q => q.number !== q.outputQuestionNumber,
+  )
+
   return (
     <section className="my-6 space-y-4" dir="rtl">
       <h2 className="text-xl font-bold text-gray-800">תוצאות ניתוח — {count} שאלות</h2>
 
       {/* Summary status bar */}
-      {(diag.hasVisualContentCount > 0 || diag.needsReviewCount > 0) && (
-        <div className="text-sm text-gray-500 flex gap-3 flex-wrap py-1">
-          <span>✅ תקין: {okCount}</span>
-          {diag.needsReviewCount > 0 && (
-            <span>⚠ דורש בדיקה: {diag.needsReviewCount}</span>
+      {(diag.hasVisualContentCount > 0 || diag.needsReviewCount > 0 ||
+        diag.suspiciousNumberCount > 0 || diag.missingVisualContentCount > 0 ||
+        diag.autoSplitCount > 0) && (
+        <div className="space-y-1">
+          <div className="text-sm text-gray-500 flex gap-3 flex-wrap py-1 items-center">
+            <span>✅ תקין: {okCount}</span>
+            {diag.needsReviewCount > 0 && (
+              <span>⚠ דורש בדיקה: {diag.needsReviewCount}</span>
+            )}
+            {diag.hasVisualContentCount > 0 && (
+              <span>📊 תוכן חזותי: {diag.hasVisualContentCount}</span>
+            )}
+            {diag.suspiciousNumberCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpandedChip(c => c === 'suspicious' ? null : 'suspicious')}
+                className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer"
+              >
+                ⚠ מספר חשוד: {diag.suspiciousNumberCount}
+              </button>
+            )}
+            {diag.missingVisualContentCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setExpandedChip(c => c === 'missingVisual' ? null : 'missingVisual')}
+                className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 hover:bg-orange-200 transition-colors cursor-pointer"
+              >
+                📊 חסר תוכן חזותי/קוד: {diag.missingVisualContentCount}
+              </button>
+            )}
+            {diag.autoSplitCount > 0 && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                ✂ פוצלו אוטומטית: {diag.autoSplitCount}
+              </span>
+            )}
+          </div>
+
+          {/* Expandable lists */}
+          {expandedChip === 'suspicious' && (
+            <p className="text-xs text-amber-700 bg-amber-50 rounded p-2">
+              שאלות עם מספר מקור חשוד (פלט):{' '}
+              {exam.questions
+                .filter(q => q.status === 'suspicious-number')
+                .map(q => q.outputQuestionNumber)
+                .join(', ')}
+            </p>
           )}
-          {diag.hasVisualContentCount > 0 && (
-            <span>📊 תוכן חזותי: {diag.hasVisualContentCount}</span>
+          {expandedChip === 'missingVisual' && (
+            <p className="text-xs text-orange-700 bg-orange-50 rounded p-2">
+              שאלות עם תוכן חזותי/קוד חסר (פלט):{' '}
+              {exam.questions
+                .filter(q => q.hasMissingVisualContent)
+                .map(q => q.outputQuestionNumber)
+                .join(', ')}
+            </p>
           )}
         </div>
       )}
@@ -64,7 +125,19 @@ export default function ParsedExamPreview({ exam }: Props) {
           ⚠ מספרי שאלות לא עולים בסדר — ייתכן שגיאת קריאה: שאלות {diag.nonSequentialNumbers.join(', ')}
         </p>
       )}
-      {exam.questions.map(q => (
+
+      {/* Sort toggle */}
+      {hasNonTrivialSourceNumbers && (
+        <button
+          type="button"
+          onClick={() => setSortBySource(s => !s)}
+          className="text-xs px-2 py-1 rounded border border-gray-300 hover:bg-gray-100 transition-colors"
+        >
+          {sortBySource ? 'סדר לפי רצף (1,2,3...)' : 'סדר לפי מספר מקור'}
+        </button>
+      )}
+
+      {displayQuestions.map(q => (
         <article key={q.sequenceIndex} className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
           <p dir="rtl" className="font-semibold text-gray-800 leading-relaxed">
             <strong className="text-blue-600 ml-2">

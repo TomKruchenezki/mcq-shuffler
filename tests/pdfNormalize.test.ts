@@ -90,3 +90,30 @@ describe('normalizePdfText — option label flip', () => {
     expect(norm('תשובה שנייה .ב').trim()).toBe('ב. תשובה שנייה')
   })
 })
+
+describe('normalizePdfText — forward marker splitting', () => {
+  it('"ו. / שאלה מספר 3 text" produces "ו." then "שאלה מספר 3 text" on separate lines', () => {
+    const lines = norm('ו. / שאלה מספר 3 מה מהבאים נכון?').split('\n').filter(Boolean)
+    expect(lines[0]).toBe('ו.')
+    // The question line may start with a ZWSP marker — strip for comparison
+    const qLine = lines[1]!.replace(/^​/, '')
+    expect(qLine).toBe('שאלה מספר 3 מה מהבאים נכון?')
+  })
+
+  it('"/ שאלה מספר 0 text" (slash-only prefix) — not split because RE_FORWARD_SLASH requires a real prefix', () => {
+    const lines = norm('/ שאלה מספר 0 טקסט').split('\n').filter(Boolean)
+    // No real content before the slash — regex requires (.*?\S) to match at least one non-space char
+    // before the slash, so this line is not split and stays unchanged
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toBe('/ שאלה מספר 0 טקסט')
+  })
+
+  it('"specificity = 70% / שאלה מספר 70%" does NOT split due to percentage lookahead', () => {
+    const input = 'specificity = 70% / שאלה מספר 70%'
+    const result = norm(input)
+    // The whole line should remain intact (no split on the % context)
+    const lines = result.split('\n').filter(Boolean)
+    expect(lines).toHaveLength(1)
+    expect(lines[0]).toContain('70%')
+  })
+})

@@ -576,3 +576,75 @@ describe('diagnoseParsedExam — hasVisualContentCount and needsReviewCount', ()
     expect(diagnoseParsedExam({ questions }).needsReviewCount).toBe(1)
   })
 })
+
+describe('hasMissingVisualContent on ParsedQuestion', () => {
+  it('"הגרף הבא" with no inline code → hasMissingVisualContent = true', () => {
+    const { questions } = parseExam('1. הגרף הבא מציג נתונים — מה נכון?\nא. עולה\nב. יורד')
+    expect(questions[0]!.hasMissingVisualContent).toBe(true)
+  })
+
+  it('"נתון קטע הקוד הבא" with SELECT query → hasMissingVisualContent is falsy', () => {
+    const { questions } = parseExam(
+      '1. נתון קטע הקוד הבא: SELECT name FROM users WHERE id=1\nא. מחזיר שם\nב. שגיאה',
+    )
+    // hasMissingVisualContent is optional; when inline code is present it is false/undefined (falsy)
+    expect(questions[0]!.hasMissingVisualContent).toBeFalsy()
+  })
+
+  it('"הטבלה הבאה" with no inline table → hasMissingVisualContent = true', () => {
+    const { questions } = parseExam('1. הטבלה הבאה מציגה נתוני מכירות:\nא. עולה\nב. יורד')
+    expect(questions[0]!.hasMissingVisualContent).toBe(true)
+  })
+
+  it('"הדיאגרמה" → hasMissingVisualContent = true', () => {
+    const { questions } = parseExam('1. לפי הדיאגרמה, מה נכון?\nא. A\nב. B')
+    expect(questions[0]!.hasMissingVisualContent).toBe(true)
+  })
+
+  it('normal question without visual keywords → hasMissingVisualContent is falsy', () => {
+    const { questions } = parseExam('1. מהו 2+2?\nא. 4\nב. 5')
+    expect(questions[0]!.hasMissingVisualContent).toBeFalsy()
+  })
+})
+
+describe('QuestionStatus — suspicious-number > 999', () => {
+  it('status is suspicious-number when source number > 999', () => {
+    // Use שאלה מספר N format so the number parses correctly
+    const { questions } = parseExam('שאלה מספר 1000\nמה הפלט?\nא. כן\nב. לא')
+    expect(questions[0]!.status).toBe('suspicious-number')
+    expect(questions[0]!.number).toBe(1000)
+  })
+
+  it('status is NOT suspicious-number when source number = 999', () => {
+    const { questions } = parseExam('שאלה מספר 999\nמה הפלט?\nא. כן\nב. לא')
+    expect(questions[0]!.status).not.toBe('suspicious-number')
+  })
+})
+
+describe('percentage protection — שאלה מספר N%', () => {
+  it('"שאלה מספר 70%" does NOT create question 70', () => {
+    // The percentage immediately follows the number → should be rejected as question start
+    const { questions } = parseExam('1. שאלה\nא. accuracy=שאלה מספר 70% precision\nב. לא')
+    // Question text comes from Q1, not a spurious Q70
+    expect(questions).toHaveLength(1)
+    expect(questions[0]!.number).toBe(1)
+  })
+})
+
+describe('diagnoseParsedExam — new count fields', () => {
+  it('autoSplitCount is 0 when no splitFromEmbedded questions', () => {
+    const { questions } = parseExam('1. שאלה\nא. כן\nב. לא')
+    expect(diagnoseParsedExam({ questions }).autoSplitCount).toBe(0)
+  })
+
+  it('suspiciousNumberCount counts suspicious-number questions', () => {
+    // Number > 999 → suspicious
+    const { questions } = parseExam('שאלה מספר 1001\nמה?\nא. א\nב. ב')
+    expect(diagnoseParsedExam({ questions }).suspiciousNumberCount).toBe(1)
+  })
+
+  it('missingVisualContentCount counts hasMissingVisualContent questions', () => {
+    const { questions } = parseExam('1. הגרף הבא מציג:\nא. עולה\nב. יורד')
+    expect(diagnoseParsedExam({ questions }).missingVisualContentCount).toBe(1)
+  })
+})

@@ -506,3 +506,37 @@ describe('validateEditableExam', () => {
     expect(result.counts.ok).toBe(2)
   })
 })
+
+// ─── hasMissingVisualContent → reviewStatus mapping ───────────────────────────
+
+describe('parsedToEditable — hasMissingVisualContent status mapping', () => {
+  it('hasMissingVisualContent=true → reviewStatus "missing-visual-content"', () => {
+    const parsed: ParsedExam = {
+      questions: [{
+        number: 1, sequenceIndex: 0, outputQuestionNumber: 1,
+        questionText: 'הגרף הבא מציג נתוני מכירות:',
+        options: [makeOption('א'), makeOption('ב')],
+        status: 'visual-content',
+        hasVisualContent: true,
+        hasMissingVisualContent: true,
+      }],
+    }
+    const editable = parsedToEditable(parsed)
+    expect(editable.questions[0]!.reviewStatus).toBe('missing-visual-content')
+  })
+
+  it('hasVisualContent=true, hasMissingVisualContent=false → reviewStatus "visual-content"', () => {
+    const parsed: ParsedExam = {
+      questions: [{
+        number: 1, sequenceIndex: 0, outputQuestionNumber: 1,
+        questionText: 'בהתייחס לגרף, מה נכון?',
+        options: [makeOption('א'), makeOption('ב')],
+        status: 'visual-content',
+        hasVisualContent: true,
+        hasMissingVisualContent: false,
+      }],
+    }
+    const editable = parsedToEditable(parsed)
+    expect(editable.questions[0]!.reviewStatus).toBe('visual-content')
+  })
+})

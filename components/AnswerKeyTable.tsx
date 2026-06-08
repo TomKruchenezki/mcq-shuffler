@@ -26,6 +26,7 @@ export default function AnswerKeyTable({ rows }: Props) {
                 </td>
                 <td
                   dir="auto"
+                  style={{ unicodeBidi: 'plaintext' }}
                   className="border border-gray-200 px-4 py-2 text-start text-gray-800"
                 >
                   {row.correctAnswerText}
